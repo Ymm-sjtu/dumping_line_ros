@@ -45,7 +45,6 @@ namespace convolution_ns{
 #define RIGHT_DOWN 5
 #define LEFT_DOWN 6
 #define LEFT_UP 7
-#define OUTSIDE false
 #define SELF -2
 
 #define FREE 8
@@ -90,7 +89,7 @@ class convolution_core{
     public:
         //Member
         int scale = 0;//阶数
-        std::vector<int> conv;
+        std::vector<std::vector<int>> conv;
         const int up_norm = 1;
         const int low_norm = 0;
         const float up_norm_float = 0.0;
@@ -99,17 +98,7 @@ class convolution_core{
         //PROCESS
         void recore(const int _size, const int _position);
         void conv2x2UP();
-        void conv2x2LEFT();
         void conv2x2DOWN();
-        void conv2x2RIGHT();
-        void conv3x3UP();
-        void conv3x3LEFT();
-        void conv3x3DOWN();
-        void conv3x3RIGHT();
-        void conv3x3RIGHT_UP();
-        void conv3x3RIGHT_DOWN();
-        void conv3x3LEFT_DOWN();
-        void conv3x3LEFT_UP();
 };
 
 class convolution{
@@ -159,11 +148,10 @@ class convolution{
         void calcConvolution2x2();
         void calcConvolution3x3();
         
-        //Condition Function
-        bool conditionA(const std::vector<int> *);
+        // //Condition Function
+        // bool conditionA(const std::vector<int> *);
 
-        //Process Calculation Function
-        DistanceNode* QuickSort(DistanceNode *R, int low, int high);
+        // Process Calculation Function
         int convolute(const std::vector<int> *arr);
         void reset();
         bool cutGridMap();
@@ -177,11 +165,9 @@ class convolution{
         int getIndex(const geometry_msgs::Point _point);
 
         void getNeighborIndexes(const int _index, std::vector<int> &_vec, std::vector<bool> &_states, const int _width, const int _height);
-        void getNeighborIndexes(const int _index, std::vector<int> &_vec, std::vector<int> &_vecSN, const int _width, const int _height, const int _type);
         int getRelativeLocation(const int _index, const int _width, const int _height);
 
         bool getOrientedAreaInGrid(const float step_dist);
-        bool getMaxAreaInGrid();
 
         //Callback Function
         void callbackSubGrid(const nav_msgs::OccupancyGrid gridData);

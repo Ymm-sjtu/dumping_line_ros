@@ -24,7 +24,7 @@ int main(int argc, char **argv)
 
         // 为 /start_pose_in_grd 设置姿态
         start_pose.pose.position.x = (-146.013+414.532);
-        start_pose.pose.position.y = (948.545-734.578);
+        start_pose.pose.position.y = (915.545-734.578);
         start_pose.pose.position.z = 0.0;
         start_pose.pose.orientation.x = 0.0;
         start_pose.pose.orientation.y = 0.0;
@@ -33,7 +33,7 @@ int main(int argc, char **argv)
 
         // 为 /recommend_grd 设置不同的姿态
         recommend_pose.pose.position.x = (-146.013+414.532);
-        recommend_pose.pose.position.y = (948.545-734.578);
+        recommend_pose.pose.position.y = (915.545-734.578);
         recommend_pose.pose.position.z = 0.0;
         recommend_pose.pose.orientation.x = 0.0;
         recommend_pose.pose.orientation.y = 0.0;

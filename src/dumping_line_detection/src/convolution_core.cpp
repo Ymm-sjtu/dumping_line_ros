@@ -1,7 +1,6 @@
 #include <ros/ros.h>
 #include "dumping_line_detection/convolution_core.h"
 
-
 namespace convolution_ns{
     
 convolution::convolution()
@@ -485,13 +484,11 @@ void convolution::getNeighborIndexes(const int _index, std::vector<int> &_vec, s
 
 void convolution::calcConvolution2x2()
 {
-    // ROS_ASSERT_MSG(core.conv.size() == 4,"ERROR : Call the calcConvolution2x2 funtion but the core is not 2x2.");
-    // int basicIndex[4] = {-1,-1, SELF, -1};
-    // std::vector<int> nearbyIndex(basicIndex, basicIndex+4);//使用int数组赋值vector
+
     std::vector<int> nearbyIndex(4, 0);
     std::vector<int> nearbyValue(4, 0);//1维长度为4的vector且数值均为0
     int outcome = 0, posi = -1, leaderInCore = -1;
-    //posi:栅格相对于车体的位置，两条45度直线；leaderInCore:栅格相对于车体的位置，横竖两条直线
+    //posi:栅格区域在车体的上面还是下面；leaderInCore:栅格相对于车体的位置，横竖两条直线
 
     for(int i = 0; i < grid.data.size(); i++)
     {
@@ -504,19 +501,20 @@ void convolution::calcConvolution2x2()
         getNearbyIndex2x2(i, &nearbyIndex, leaderInCore, grid.info.width, grid.info.height);//where we refresh nearbyIndex
         getNearbyValues(i, &nearbyIndex, &nearbyValue);//where we refresh nearbyValue
 
-        //Condition A
-        ROS_ASSERT(i < grid_after_conv.data.size() && i >= 0);
-        if(conditionA(&nearbyValue) == true){grid_after_conv.data.at(i) = 0;continue;}
+        // //Condition A
+        // ROS_ASSERT(i < grid_after_conv.data.size() && i >= 0);
+        // if(conditionA(&nearbyValue) == true){grid_after_conv.data.at(i) = 0;continue;}
 
         //Condition SELF
         if(i == vehicle_posi_index){grid_after_conv.data.at(i) = grid.data.at(i);continue;}
 
         outcome = convolute(&nearbyValue);
-        ROS_ASSERT_MSG(outcome <= 2 && outcome >=0, "ERROR : Wrong outcome after single convolution for only (int)[0, 2] is legal.");
-        grid_after_conv.data.at(i) = outcome*50;
+        ROS_ASSERT_MSG(outcome <= 4 && outcome >=0, "ERROR : Wrong outcome after single convolution for only (int)[0, 4] is legal.");
+        if(outcome == 4)
+            grid_after_conv.data.at(i) = 100;
+        else
+            grid_after_conv.data.at(i) = 0;
     }
-    // ROS_ASSERT(vehicle_posi_index < grid_after_conv.data.size() && vehicle_posi_index >= 0);
-    // grid_after_conv.data.at(vehicle_posi_index) = 127;
 }
 
 /*
@@ -529,23 +527,11 @@ void convolution::calcConvolution2x2()
 */
 int convolution::getRelativePosi(const int index, const int _scale)
 {
-    ROS_ASSERT_MSG(index >= 0 && vehicle_posi_index >= 0 && index < grid.info.height*grid.info.width 
-        && vehicle_posi_index < grid.info.height*grid.info.width, "ERROR : Fail to get relative position cause index out of range.");
-    int delta_X = index%grid.info.width - vehicle_posi_index%grid.info.width;
-    int delta_Y = static_cast<int>(index/grid.info.width) - static_cast<int>(vehicle_posi_index/grid.info.width);
-    if(_scale == 2)
-    {
-        if(delta_X > 0 && abs(delta_Y) <= abs(delta_X)){return RIGHT;}
-        else if(delta_X <= 0 && abs(delta_Y) <= abs(delta_X)){return LEFT;}
-        else if(delta_Y >= 0){return UP;}
-        else{return DOWN;}
-    }
-    // else if(_scale == 3)
-    // {
-    //     //需要补充
-    // }
-    else 
-        return 0;
+    float yaw = tf::getYaw(oriented_pose.orientation);
+    if(0 < yaw && yaw < M_PI) // 0~180度
+        return UP;
+    else
+        return DOWN;
 }
 
 int convolution::getLeaderInCore(const int index, const int _scale)
@@ -561,10 +547,6 @@ int convolution::getLeaderInCore(const int index, const int _scale)
         else if(delta_X > 0){return RIGHT_DOWN;}
         else{return LEFT_DOWN;}
     }
-    // else if(_scale == 3)
-    // {
-    //     //需要补充
-    // }
     else 
         return 0;
 }
@@ -580,26 +562,15 @@ void convolution_core::recore(const int _scale, const int position)
     {
         switch(position)
         {
-            case UP: conv2x2UP();break;
-            case DOWN: conv2x2DOWN();break;
-            case LEFT: conv2x2LEFT();break;
-            case RIGHT: conv2x2RIGHT();break;
+            case UP: 
+                conv2x2UP();
+                break;
+            case DOWN: 
+                conv2x2DOWN();
+                break;
         }
     }
-    else if(_scale == 3)
-    {
-        switch(position)
-        {
-            case UP: conv3x3UP();break;
-            case RIGHT: conv3x3RIGHT();break;
-            case DOWN: conv3x3DOWN();break;
-            case LEFT: conv3x3LEFT();break;
-            case RIGHT_UP: conv3x3RIGHT_UP();break;
-            case RIGHT_DOWN: conv3x3RIGHT_DOWN();break;
-            case LEFT_DOWN: conv3x3LEFT_DOWN();break;
-            case LEFT_UP: conv3x3LEFT_UP();break;
-        }
-    }
+
 }
 /*
     【仅适用于2x2卷积核】获取某一个index的周围栅格的index，并存入_nearby_index
@@ -611,34 +582,6 @@ void convolution_core::recore(const int _scale, const int position)
 void convolution::getNearbyIndex2x2(const int i, std::vector<int> *_nearby_index, const int LeaderInCore, const int width, const int height)
 {
     ROS_ASSERT_MSG(i >= 0, "ERROR : Could not get nearby index cause the current index < 0");
-    // ROS_INFO("size of _nearby_index in get Nearby Index = %ld",_nearby_index->size());
-    // if(i - width < 0)
-    // {
-    //     _nearby_index->at(0) = -1; 
-    //     _nearby_index->at(1) = -1;
-    //     if((i+1)%width == 0)
-    //     {
-    //         _nearby_index->at(3) = -1;
-    //     }
-    //     else
-    //     {
-    //         _nearby_index->at(3) = i+1;
-    //     }
-    // }
-    // else
-    // {
-    //     _nearby_index->at(0)= i - width;
-    //     if((i+1)%width == 0)
-    //     {
-    //         _nearby_index->at(1) = -1;
-    //         _nearby_index->at(3) = -1;
-    //     }
-    //     else{
-    //         _nearby_index->at(1) = i - width + 1;
-    //         _nearby_index->at(3) = i + 1;
-    //     }
-    // }
-
     if(LeaderInCore == LEFT_UP)
     {
         _nearby_index->at(0) = (i % width != 0) ? i - 1 : -1;
@@ -730,61 +673,18 @@ void convolution::calcConvolution3x3()
 */
 
 //Judge if satisfied condition A，初步筛选
-bool convolution::conditionA(const std::vector<int> *values)
-{
-    bool flag  = false;
-    for(int i = 0; i < core.conv.size(); i++)
-    {
-        // ROS_INFO("Current core.conv.at(%d) = %d", i, core.conv.at(i));
-        ROS_ASSERT(i >= 0 && i < values->size());
-        if(core.conv.at(i) == 0 && values->at(i) != 0){flag = true;}
-    }
-    return flag;
-} 
-
-/*
-    ###################################
-    ###
-    ###          Process Calculation Function
-    ###
-    ###################################
-*/
-
-
-// /*!
-//     \brief 快速排序算法
-//     \param R 指向元素为DistanceNode结构体的数组指针
-//     \param low 数组的首下标
-//     \param high 数组的尾下标
-// */
-// DistanceNode* convolution::QuickSort(DistanceNode *R, int low, int high)
+// bool convolution::conditionA(const std::vector<int> *values)
 // {
-//     DistanceNode temp;
-//     int i = low, j = high;
-//     if(low < high)
+//     bool flag  = false;
+//     for(int i = 0; i < core.conv.size(); i++)
 //     {
-//         temp = R[low];
-//         while(i<j)
-//         {
-//             while(i<j && R[j].distance>=temp.distance) --j;
-//             if(i<j)
-//             {
-//                 R[i] = R[j];
-//                 i++;
-//             }
-//             while (i<j && R[i].distance<=temp.distance) i++;
-//             if(i<j)
-//             {
-//                 R[j] = R[i];
-//                 --j;
-//             }
-//         }
-//         R[i] = temp;
-//         R = QuickSort(R, low, i-1);
-//         R = QuickSort(R, i+1, high);
+//         // ROS_INFO("Current core.conv.at(%d) = %d", i, core.conv.at(i));
+//         ROS_ASSERT(i >= 0 && i < values->size());
+//         if(core.conv.at(i) == 0 && values->at(i) != 0){flag = true;}
 //     }
-//     return R;
-// }
+//     return flag;
+// } 
+
 
 /*
     【适用于任意阶数卷积核】卷积计算函数
@@ -796,173 +696,23 @@ bool convolution::conditionA(const std::vector<int> *values)
 */
 int convolution::convolute(const std::vector<int> *arr)
 {
-    int out = 0;
+    std::vector<int> score(core.conv.size(), 0);
     // ROS_INFO("lengthof arr = %d, core.conv.size() = %d", arr->size(), core.conv.size());
-    ROS_ASSERT_MSG(arr->size() == core.conv.size(), "ERROR : Error occurs for not matched size of convolution core and nearbyValues.");
-    for(int ii = 0; ii < arr->size(); ii++)
+    // ROS_ASSERT_MSG(arr->size() == core.conv.size(), "ERROR : Error occurs for not matched size of convolution core and nearbyValues.");
+    for(int order = 0; order < core.conv.size(); order++)
     {
-        ROS_ASSERT(ii >= 0 && ii < core.conv.size());
-        out += core.conv.at(ii)*arr->at(ii);
+        std::vector<int> currentCore = core.conv.at(order);
+        for(int i = 0; i < currentCore.size(); i++)
+        {
+            if(currentCore.at(i) == arr->at(i))
+            {
+                score.at(order) += 1;
+            }
+        }
     }
-    return out;
+    auto maxScore = std::max_element(score.begin(), score.end());
+    return *maxScore;
 } 
-
-
-
-// /*
-//     遍历并分类grid中的全部栅格
-//     处理成员变量：
-//         grid
-//     输出：
-//         std::vector<int> vecSN
-//     返回：
-//         flag：是否成功找到
-// */
-// bool convolution::getMaxAreaInGrid()
-// {
-//     std::vector<int> vecSN;
-//     std::vector<int> active_vec;
-//     std::vector<int> nearby_indexes;
-
-//     vecSN.resize(grid.data.size(), -1);
-
-//     int type = 0;
-//     for(int i = 0; i < grid.data.size(); i++)
-//     {
-//         if(grid.data.at(i) == 0){continue;}//无效栅格
-//         if(vecSN.at(i) != -1){continue;}//有效栅格但已经被分类
-
-//         vecSN.at(i) = type;
-
-//         active_vec.push_back(i);
-//         while(active_vec.size() != 0)
-//         {
-//             getNeighborIndexes(active_vec.back(), nearby_indexes, vecSN, grid.info.width, grid.info.height, type);
-//             active_vec.pop_back();//删除已经用过的最后一位元素
-            
-//             int _tmp = 0;
-//             for(int i = 0; i < nearby_indexes.size(); i++)
-//             {
-//                 _tmp = nearby_indexes.at(i);
-//                 ROS_ASSERT(vecSN.at(_tmp) == -1);
-//                 if(grid.data.at(_tmp) == 100 && vecSN.at(_tmp) == -1)
-//                 {
-//                     active_vec.push_back(_tmp);//符合要求的才能被填入active_vec
-//                     vecSN.at(_tmp) = type;
-//                 }
-//             }
-//         }
-
-//         type++;
-//     }
-
-//     grid.data.clear();
-//     grid.data.resize(grid.info.width*grid.info.height, 0);
-
-//     //统计各个类型各有多少个栅格
-//     std::vector<int> typeCounts;
-//     for(int _ty = 0; _ty < type; _ty++)
-//     {
-//         int count = std::count(vecSN.begin(), vecSN.end(), _ty);
-//         typeCounts.push_back(count);
-//     }
-
-//     //找到最多数量的栅格块所属的类型
-//     int maxPosition = max_element(typeCounts.begin(), typeCounts.end()) - typeCounts.begin();//最大值下标索引，同时也是其类型
-
-
-//     return true;
-// }
-
-
-
-// void convolution::getNeighborIndexes(const int _index, std::vector<int> &_vec, std::vector<int> &_vecSN, const int _width, const int _height, const int _type)
-// {
-//     _vec.clear();
-//     int RL = getRelativeLocation(_index, _width, _height);
-
-//     //需要存上方栅格
-//     if(RL != UP_EDGE && RL != LEFTUP_EDGE && RL != RIGHTUP_EDGE)
-//     {
-//         ROS_ASSERT(_index + _width >= 0 && _index + _width < _vecSN.size());
-//         if(_vecSN.at(_index + _width) == -1)//上方栅格未用
-//         {
-//             _vec.push_back(_index + _width);//存入上方栅格
-//             // _grids.at(_index + _width).SN = _type;//上方栅格状态改为已用
-//         }
-//     }
-//     //需要存左方栅格
-//     if(RL != LEFT_EDGE && RL != LEFTUP_EDGE && RL != LEFTDOWN_EDGE)
-//     {
-//         ROS_ASSERT(_index-1 >= 0 && _index-1 < _vecSN.size());
-//         if(_vecSN.at(_index - 1) == -1)
-//         {
-//             _vec.push_back(_index - 1);
-//             // _grids.at(_index - 1).SN = _type;
-//         }
-//     }
-//     //需要存右方栅格
-//     if(RL != RIGHT_EDGE && RL != RIGHTUP_EDGE && RL != RIGHTDOWN_EDGE)
-//     {
-//         ROS_ASSERT(_index + 1 >= 0 && _index + 1 < _vecSN.size());
-//         if(_vecSN.at(_index + 1) == -1)
-//         {
-//             _vec.push_back(_index + 1);
-//             // _grids.at(_index + 1).SN = _type;
-//         }
-//     }
-//     //需要存下方栅格
-//     if(RL != DOWN_EDGE && RL != LEFTDOWN_EDGE && RL != RIGHTDOWN_EDGE)
-//     {
-//         ROS_ASSERT(_index - _width >= 0 && _index - _width < _vecSN.size());
-//         if(_vecSN.at(_index - _width) == -1)
-//         {
-//             _vec.push_back(_index - _width);
-//             // _grids.at(_index - _width).SN = _type;
-//         }
-//     }
-//     //需要存右上栅格
-//     if(RL == LEFTDOWN_EDGE || RL == LEFT_EDGE || RL == DOWN_EDGE || RL == FREE)
-//     {
-//         ROS_ASSERT(_index + _width + 1 >= 0 && _index + _width + 1 < _vecSN.size());
-//         if(_vecSN.at(_index + _width + 1) == -1)
-//         {
-//             _vec.push_back(_index + _width + 1);
-//             // _grids.at(_index + _width + 1).SN = _type;
-//         }
-//     }
-//     //需要存右下栅格
-//     if(RL == LEFTUP_EDGE || RL == UP_EDGE || RL == LEFT_EDGE || RL == FREE)
-//     {
-//         ROS_ASSERT(_index - _width + 1 >= 0 && _index - _width + 1 < _vecSN.size());
-//         if(_vecSN.at(_index - _width + 1) == -1)
-//         {
-//             _vec.push_back(_index - _width + 1);
-//             // _grids.at(_index - _width + 1).SN = _type;
-//         }
-//     }
-//     //需要存左上栅格
-//     if(RL == RIGHTDOWN_EDGE || RL == RIGHT_EDGE || RL == DOWN_EDGE || RL == FREE)
-//     {
-//         ROS_ASSERT(_index + _width - 1 >= 0 && _index + _width - 1 < _vecSN.size());
-//         if(_vecSN.at(_index + _width - 1) == -1)
-//         {
-//             _vec.push_back(_index + _width - 1);
-//             // _grids.at(_index + _width - 1).SN = _type;
-//         }
-//     }
-//     //需要存左下栅格
-//     if(RL == RIGHTUP_EDGE || RL == RIGHT_EDGE || RL == UP_EDGE || RL == FREE)
-//     {
-//         ROS_ASSERT(_index - _width - 1 >= 0 && _index - _width - 1 < _vecSN.size());
-//         if(_vecSN.at(_index - _width - 1) == -1)
-//         {
-//             _vec.push_back(_index - _width - 1);
-//             // _grids.at(_index - _width - 1).SN = _type;
-//         }
-//     }
-
-// }
 
 /*
     ###################################
@@ -977,18 +727,7 @@ void convolution::callbackSubRecommendPose(const geometry_msgs::PoseStamped reco
     ROS_INFO("Received: Get the Recommended Pose In GRD.");
     recommend_pose = recommendPose.pose;
     oriented_pose.position = recommendPose.pose.position;
-    // oriented_pose.position.x = recommendPose.pose.position.x + origin_x;
-    // oriented_pose.position.y = recommendPose.pose.position.y + origin_y;
-    // oriented_pose.position.z = recommendPose.pose.position.z ;
-    // std::cout << "recommendPose.pose.position.x = " << recommendPose.pose.position.x 
-    //          << "recommendPose.pose.position.y = " << recommendPose.pose.position.y 
-    //          << std::endl;
-    
-    std::cout << "oriented_pose.position.x = " << oriented_pose.position.x 
-             << "oriented_pose.position.y = " << oriented_pose.position.y
-             << std::endl;
     oriented_pose.orientation = tf::createQuaternionMsgFromYaw(M_PI + tf::getYaw(recommendPose.pose.orientation));
-    std::cout << oriented_pose.orientation.x << " " << oriented_pose.orientation.y << " " << oriented_pose.orientation.z << " " << oriented_pose.orientation.w << std::endl;
     ifGetRcmdPose = true;
 }
 
@@ -1030,82 +769,32 @@ void convolution::callbackSubVehiclePose(const geometry_msgs::PoseStamped vehicl
 
 void convolution_core::conv2x2UP()
 {
-    scale = 2;
-    conv.resize(pow(scale, 2));
-    conv.at(0) = low_norm;
-    conv.at(1) = low_norm;
-    conv.at(2) = up_norm;
-    conv.at(3) = up_norm;
+    conv.clear();
+    std::vector<int> case1 = {1, 0, 1, 0};
+    std::vector<int> case2 = {1, 0, 1, 1};
+    std::vector<int> case3 = {0, 0, 1, 1};
+    std::vector<int> case4 = {0, 1, 1, 1};
+    std::vector<int> case5 = {0, 1, 0, 1};
+    conv.push_back(case1);
+    conv.push_back(case2);
+    conv.push_back(case3);
+    conv.push_back(case4);
+    conv.push_back(case5);
 }
 void convolution_core::conv2x2DOWN()
 {
-    scale = 2;
-    conv.resize(pow(scale, 2));
-    conv.at(0) = up_norm;
-    conv.at(1) = up_norm;
-    conv.at(2) = low_norm;
-    conv.at(3) = low_norm;
+    conv.clear();
+    std::vector<int> case1 = {1, 0, 1, 0};
+    std::vector<int> case2 = {1, 1, 1, 0};
+    std::vector<int> case3 = {1, 1, 0, 0};
+    std::vector<int> case4 = {1, 1, 0, 1};
+    std::vector<int> case5 = {0, 1, 0, 1};
+    conv.push_back(case1);
+    conv.push_back(case2);
+    conv.push_back(case3);
+    conv.push_back(case4);
+    conv.push_back(case5);
 }
-void convolution_core::conv2x2RIGHT()
-{
-    scale = 2;
-    conv.resize(pow(scale, 2));
-    conv.at(0) = low_norm;
-    conv.at(1) = up_norm;
-    conv.at(2) = low_norm;
-    conv.at(3) = up_norm;
-}
-void convolution_core::conv2x2LEFT()
-{
-    scale = 2;
-    conv.resize(pow(scale, 2));
-    conv.at(0) = up_norm;
-    conv.at(1) = low_norm;
-    conv.at(2) = up_norm;
-    conv.at(3) = low_norm;
-}
-void convolution_core::conv3x3UP()
-{
-    scale = 3;
-    conv.resize(pow(scale, 2), low_norm);
-}
-void convolution_core::conv3x3DOWN()
-{
-    scale = 3;
-    conv.resize(pow(scale, 2), low_norm);
-}
-void convolution_core::conv3x3RIGHT()
-{
-    scale = 3;
-    conv.resize(pow(scale, 2), low_norm);
-}
-void convolution_core::conv3x3LEFT()
-{
-    scale = 3;
-    conv.resize(pow(scale, 2), low_norm);
-}
-void convolution_core::conv3x3RIGHT_UP()
-{
-    scale = 3;
-    conv.resize(pow(scale, 2), low_norm);
-}
-void convolution_core::conv3x3RIGHT_DOWN()
-{
-    scale = 3;
-    conv.resize(pow(scale, 2), low_norm);
-}
-void convolution_core::conv3x3LEFT_UP()
-{
-    scale = 3;
-    conv.resize(pow(scale, 2), low_norm);
-}
-void convolution_core::conv3x3LEFT_DOWN()
-{
-    scale = 3;
-    conv.resize(pow(scale, 2), low_norm);
-}
-
-
 
 /*
     #############################################
