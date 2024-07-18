@@ -1,0 +1,10 @@
+<launch>
+  <!-- 启动 dumping_line_detection 节点 -->
+  <node pkg="dumping_line_detection" type="dumping_line_detection_node" name="dumping_line_detection" output="screen"/>
+
+  <!-- 启动 map_publish 节点 -->
+  <node pkg="map_publish" type="map_publish_node" name="map_publish" output="screen"/>
+
+  <!-- 启动 pose_publish 节点 -->
+  <node pkg="pose_publish" type="pose_publish_node" name="pose_publish" output="screen"/>
+</launch>
