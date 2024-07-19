@@ -485,35 +485,51 @@ void convolution::getNeighborIndexes(const int _index, std::vector<int> &_vec, s
 void convolution::calcConvolution2x2()
 {
 
-    std::vector<int> nearbyIndex(4, 0);
+    std::vector<int> nearbyIndex = {SELF, 0, 0, 0};
     std::vector<int> nearbyValue(4, 0);//1维长度为4的vector且数值均为0
-    int outcome = 0, posi = -1, leaderInCore = -1;
-    //posi:栅格区域在车体的上面还是下面；leaderInCore:栅格相对于车体的位置，横竖两条直线
+    std::pair<int, int> result = std::make_pair(0, 0);
+    int posi = -1;
+    //posi:栅格区域在车体的上面还是下面；
 
     for(int i = 0; i < grid.data.size(); i++)
     {
-        outcome = 0;
         posi = getRelativePosi();
         core.recore(2, posi);
         
-        leaderInCore = getLeaderInCore(i, 2);
+        // leaderInCore = getLeaderInCore(i, 2);
 
-        getNearbyIndex2x2(i, &nearbyIndex, leaderInCore, grid.info.width, grid.info.height);//where we refresh nearbyIndex
+        getNearbyIndex2x2(i, &nearbyIndex, grid.info.width, grid.info.height);//where we refresh nearbyIndex
         getNearbyValues(i, &nearbyIndex, &nearbyValue);//where we refresh nearbyValue
-
-        // //Condition A
-        // ROS_ASSERT(i < grid_after_conv.data.size() && i >= 0);
-        // if(conditionA(&nearbyValue) == true){grid_after_conv.data.at(i) = 0;continue;}
 
         //Condition SELF
         if(i == vehicle_posi_index){grid_after_conv.data.at(i) = grid.data.at(i);continue;}
 
-        outcome = convolute(&nearbyValue);
-        ROS_ASSERT_MSG(outcome <= 4 && outcome >=0, "ERROR : Wrong outcome after single convolution for only (int)[0, 4] is legal.");
-        if(outcome == 4)
-            grid_after_conv.data.at(i) = 100;
-        else
-            grid_after_conv.data.at(i) = 0;
+        result = convolute(&nearbyValue);
+        ROS_ASSERT_MSG(result.first <= 4 && result.first >=0, "ERROR : Wrong outcome after single convolution for only (int)[0, 4] is legal.");
+        
+        // core.conv.at(result.second);
+        if(result.first == 4)
+        {
+            if(core.conv.at(result.second).at(0) == 0)
+                grid_after_conv.data.at(i-grid_after_conv.info.width) = 100;
+            if(core.conv.at(result.second).at(1) == 0)
+                grid_after_conv.data.at(i-grid_after_conv.info.width+1) = 100;
+            if(core.conv.at(result.second).at(2) == 0)
+                grid_after_conv.data.at(i) = 100;
+            if(core.conv.at(result.second).at(3) == 0)
+                grid_after_conv.data.at(i+1) = 100;
+        }
+        // else
+        // {
+        //     if(core.conv.at(result.second).at(0) == 1)
+        //         grid_after_conv.data.at(i-grid_after_conv.info.width) = 0;
+        //     if(core.conv.at(result.second).at(1) == 1)
+        //         grid_after_conv.data.at(i-grid_after_conv.info.width+1) = 0;
+        //     if(core.conv.at(result.second).at(2) == 1)
+        //         grid_after_conv.data.at(i) = 0;
+        //     if(core.conv.at(result.second).at(3) == 1)
+        //         grid_after_conv.data.at(i+1) = 0;
+        // }
     }
 }
 
@@ -543,23 +559,6 @@ int convolution::getRelativePosi()
         return LEFT;
 }
 
-int convolution::getLeaderInCore(const int index, const int _scale)
-{
-    ROS_ASSERT_MSG(index >= 0 && vehicle_posi_index >= 0 && index < grid.info.height*grid.info.width 
-        && vehicle_posi_index < grid.info.height*grid.info.width, "ERROR : Fail to get relative position cause index out of range.");
-    int delta_X = index%grid.info.width - vehicle_posi_index%grid.info.width;
-    int delta_Y = static_cast<int>(index/grid.info.width) - static_cast<int>(vehicle_posi_index/grid.info.width);
-    if(_scale == 2)
-    {
-        if(delta_X > 0 && delta_Y > 0){return RIGHT_UP;}
-        else if(delta_X <= 0 && delta_Y > 0){return LEFT_UP;}
-        else if(delta_X > 0){return RIGHT_DOWN;}
-        else{return LEFT_DOWN;}
-    }
-    else 
-        return 0;
-}
-
 /*
     _scale : 2 for 2x2 while 3 for 3x3
     position : the relative position between the current index and the vehicle position index
@@ -568,22 +567,55 @@ void convolution_core::recore(const int _scale, const int position)
 { 
     ROS_ASSERT_MSG(_scale == 2 || _scale == 3, "ERROR : Fail to recore cause wrong size.");
     if(_scale == 2)
-    {
+    {   
+        conv.clear();
+        std::vector<int> case1, case2, case3, case4, case5, case6, case7;
         switch(position)
         {
             case UP: 
-                conv2x2UP();
+                case1 = {1, 0, 1, 0};
+                case2 = {1, 0, 1, 1};
+                case3 = {0, 0, 1, 1};
+                case4 = {0, 1, 1, 1};
+                case5 = {0, 1, 0, 1};
+                case6 = {0, 0, 1, 0};
+                case7 = {0, 0, 0, 1};
                 break;
             case DOWN: 
-                conv2x2DOWN();
+                case1 = {1, 0, 1, 0};
+                case2 = {1, 1, 1, 0};
+                case3 = {1, 1, 0, 0};
+                case4 = {1, 1, 0, 1};
+                case5 = {0, 1, 0, 1};
+                case6 = {1, 0, 0, 0};
+                case7 = {0, 1, 0, 0};
                 break;
             case LEFT:
-                conv2x2LEFT();
+                case1 = {0, 0, 1, 1};
+                case2 = {1, 0, 1, 1};
+                case3 = {1, 0, 1, 0};
+                case4 = {1, 1, 1, 0};
+                case5 = {1, 1, 0, 0};
+                case6 = {0, 0, 1, 0};
+                case7 = {1, 0, 0, 0};
                 break;
             case RIGHT:
-                conv2x2RIGHT();
+                case1 = {0, 0, 1, 1};
+                case2 = {0, 1, 1, 1};
+                case3 = {0, 1, 0, 1};
+                case4 = {1, 1, 0, 1};
+                case5 = {1, 1, 0, 0};
+                case6 = {0, 0, 0, 1};
+                case7 = {0, 1, 0, 0};
                 break;
         }
+        conv.push_back(case1);
+        conv.push_back(case2);
+        conv.push_back(case3);
+        conv.push_back(case4);
+        conv.push_back(case5);
+        conv.push_back(case6);
+        conv.push_back(case7);
     }
 
 }
@@ -594,38 +626,13 @@ void convolution_core::recore(const int _scale, const int position)
     输出：
         _nearby_index：该栅格周围栅格的index
 */
-void convolution::getNearbyIndex2x2(const int i, std::vector<int> *_nearby_index, const int LeaderInCore, const int width, const int height)
+void convolution::getNearbyIndex2x2(const int i, std::vector<int> *_nearby_index, const int width, const int height)
 {
     ROS_ASSERT_MSG(i >= 0, "ERROR : Could not get nearby index cause the current index < 0");
-    if(LeaderInCore == LEFT_UP)
-    {
-        _nearby_index->at(0) = (i % width != 0) ? i - 1 : -1;
-        _nearby_index->at(1) = SELF;
-        _nearby_index->at(2) = ((i < (height-1)*width) && (i % width != 0)) ? i + width - 1 : -1;
-        _nearby_index->at(3) = (i < (height-1)*width) ? i + width : -1;
-    }
-    if(LeaderInCore == RIGHT_UP)
-    {
-        _nearby_index->at(0) = SELF;
-        _nearby_index->at(1) = ((i + 1) % width != 0) ? i + 1 : -1;
-        _nearby_index->at(2) = (i < (height-1)*width) ? i + width : -1;
-        _nearby_index->at(3) = ((i < (height-1)*width) && ((i + 1) % width != 0)) ? i + width + 1 : -1;
-    }
-    if(LeaderInCore == LEFT_DOWN)
-    {
-        _nearby_index->at(0) = ((i - width >= 0) && (i % width != 0)) ? i - width - 1 : -1;
-        _nearby_index->at(1) = (i - width >= 0) ? i - width : -1;
-        _nearby_index->at(2) = (i % width != 0) ? i - 1 : -1;
-        _nearby_index->at(3) = SELF;
-    }
-    if(LeaderInCore == RIGHT_DOWN)
-    {
-        _nearby_index->at(0) = (i - width >= 0) ? i - width : -1;
-        _nearby_index->at(1) = ((i - width >= 0) && ((i + 1) % width != 0)) ? i - width + 1 : -1;
-        _nearby_index->at(2) = SELF;
-        _nearby_index->at(3) = ((i + 1) % width != 0) ? i + 1 : -1;
-    }
-
+    _nearby_index->at(0) = (i - width >= 0) ? i - width : -1;
+    _nearby_index->at(1) = ((i - width >= 0) && ((i + 1) % width != 0)) ? i - width + 1 : -1;
+    _nearby_index->at(2) = SELF;
+    _nearby_index->at(3) = ((i + 1) % width != 0) ? i + 1 : -1;
 }
 
 /*
@@ -665,42 +672,6 @@ int convolution::getNearbyValue(const int data1, const int threshold)
     else { return 0;}
 }
 
-void convolution::reset()
-{
-    grid.data.clear();
-    grid.header.frame_id = "null";
-    ifSubVehiclePose = false;
-    ifGetRcmdPose = false;
-}
-
-
-void convolution::calcConvolution3x3()
-{
-    //需要补充QuickSort
-}
-
-/*
-    ###################################
-    ###
-    ###               Condition Function
-    ###
-    ###################################
-*/
-
-//Judge if satisfied condition A，初步筛选
-// bool convolution::conditionA(const std::vector<int> *values)
-// {
-//     bool flag  = false;
-//     for(int i = 0; i < core.conv.size(); i++)
-//     {
-//         // ROS_INFO("Current core.conv.at(%d) = %d", i, core.conv.at(i));
-//         ROS_ASSERT(i >= 0 && i < values->size());
-//         if(core.conv.at(i) == 0 && values->at(i) != 0){flag = true;}
-//     }
-//     return flag;
-// } 
-
-
 /*
     【适用于任意阶数卷积核】卷积计算函数
     输入：
@@ -709,9 +680,11 @@ void convolution::calcConvolution3x3()
         out：int型存储的卷积数值
     注意：arr的长度应当等于卷积核vector的长度。如3x3卷积核，arr和conv的size都应该为9
 */
-int convolution::convolute(const std::vector<int> *arr)
+std::pair<int, int>  convolution::convolute(const std::vector<int> *arr)
 {
     std::vector<int> score(core.conv.size(), 0);
+    int maxValue = 0;
+    int maxIndex = 0;
     // ROS_INFO("lengthof arr = %d, core.conv.size() = %d", arr->size(), core.conv.size());
     // ROS_ASSERT_MSG(arr->size() == core.conv.size(), "ERROR : Error occurs for not matched size of convolution core and nearbyValues.");
     for(int order = 0; order < core.conv.size(); order++)
@@ -726,8 +699,26 @@ int convolution::convolute(const std::vector<int> *arr)
         }
     }
     auto maxScore = std::max_element(score.begin(), score.end());
-    return *maxScore;
+    maxValue = *maxScore;
+    maxIndex = std::distance(score.begin(), maxScore);
+    return std::make_pair(maxValue, maxIndex);
 } 
+
+
+void convolution::reset()
+{
+    grid.data.clear();
+    grid.header.frame_id = "null";
+    ifSubVehiclePose = false;
+    ifGetRcmdPose = false;
+}
+
+
+void convolution::calcConvolution3x3()
+{
+    //需要补充QuickSort
+}
+
 
 /*
     ###################################
@@ -774,70 +765,6 @@ void convolution::callbackSubVehiclePose(const geometry_msgs::PoseStamped vehicl
     ifSubVehiclePose = true;
 }
 
-/*
-    ###################################
-    ###
-    ###          convolution_core Function
-    ###
-    ###################################
-*/
-
-void convolution_core::conv2x2UP()
-{
-    conv.clear();
-    std::vector<int> case1 = {1, 0, 1, 0};
-    std::vector<int> case2 = {1, 0, 1, 1};
-    std::vector<int> case3 = {0, 0, 1, 1};
-    std::vector<int> case4 = {0, 1, 1, 1};
-    std::vector<int> case5 = {0, 1, 0, 1};
-    conv.push_back(case1);
-    conv.push_back(case2);
-    conv.push_back(case3);
-    conv.push_back(case4);
-    conv.push_back(case5);
-}
-void convolution_core::conv2x2DOWN()
-{
-    conv.clear();
-    std::vector<int> case1 = {1, 0, 1, 0};
-    std::vector<int> case2 = {1, 1, 1, 0};
-    std::vector<int> case3 = {1, 1, 0, 0};
-    std::vector<int> case4 = {1, 1, 0, 1};
-    std::vector<int> case5 = {0, 1, 0, 1};
-    conv.push_back(case1);
-    conv.push_back(case2);
-    conv.push_back(case3);
-    conv.push_back(case4);
-    conv.push_back(case5);
-}
-void convolution_core::conv2x2LEFT()
-{
-    conv.clear();
-    std::vector<int> case1 = {0, 0, 1, 1};
-    std::vector<int> case2 = {1, 0, 1, 1};
-    std::vector<int> case3 = {1, 0, 1, 0};
-    std::vector<int> case4 = {1, 1, 1, 0};
-    std::vector<int> case5 = {1, 1, 0, 0};
-    conv.push_back(case1);
-    conv.push_back(case2);
-    conv.push_back(case3);
-    conv.push_back(case4);
-    conv.push_back(case5);
-}
-void convolution_core::conv2x2RIGHT()
-{
-    conv.clear();
-    std::vector<int> case1 = {0, 0, 1, 1};
-    std::vector<int> case2 = {0, 1, 1, 1};
-    std::vector<int> case3 = {0, 1, 0, 1};
-    std::vector<int> case4 = {1, 1, 0, 1};
-    std::vector<int> case5 = {1, 1, 0, 0};
-    conv.push_back(case1);
-    conv.push_back(case2);
-    conv.push_back(case3);
-    conv.push_back(case4);
-    conv.push_back(case5);
-}
 /*
     #############################################
     ###
