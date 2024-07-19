@@ -493,7 +493,7 @@ void convolution::calcConvolution2x2()
     for(int i = 0; i < grid.data.size(); i++)
     {
         outcome = 0;
-        posi = getRelativePosi(i, 2);
+        posi = getRelativePosi();
         core.recore(2, posi);
         
         leaderInCore = getLeaderInCore(i, 2);
@@ -525,13 +525,22 @@ void convolution::calcConvolution2x2()
     输出：
         位置UP DOWN LEFT ……
 */
-int convolution::getRelativePosi(const int index, const int _scale)
+int convolution::getRelativePosi()
 {
     float yaw = tf::getYaw(oriented_pose.orientation);
-    if(0 < yaw && yaw < M_PI) // 0~180度
+    if(yaw > M_PI || yaw < -M_PI)
+    {
+        yaw = yaw - 2*M_PI*static_cast<int>(yaw/(2*M_PI));
+    }
+
+    if((M_PI/4) <= yaw && yaw < (M_PI*3/4)) // 45~135度
         return UP;
-    else
+    else if((-M_PI*3/4) <= yaw && yaw < (-M_PI/4)) // -135~-45度
         return DOWN;
+    else if((-M_PI*1/4) <= yaw && yaw < (M_PI*1/4)) // -45~45度
+        return RIGHT;
+    else  // 135~180度,-180~-135度
+        return LEFT;
 }
 
 int convolution::getLeaderInCore(const int index, const int _scale)
@@ -567,6 +576,12 @@ void convolution_core::recore(const int _scale, const int position)
                 break;
             case DOWN: 
                 conv2x2DOWN();
+                break;
+            case LEFT:
+                conv2x2LEFT();
+                break;
+            case RIGHT:
+                conv2x2RIGHT();
                 break;
         }
     }
@@ -795,7 +810,34 @@ void convolution_core::conv2x2DOWN()
     conv.push_back(case4);
     conv.push_back(case5);
 }
-
+void convolution_core::conv2x2LEFT()
+{
+    conv.clear();
+    std::vector<int> case1 = {0, 0, 1, 1};
+    std::vector<int> case2 = {1, 0, 1, 1};
+    std::vector<int> case3 = {1, 0, 1, 0};
+    std::vector<int> case4 = {1, 1, 1, 0};
+    std::vector<int> case5 = {1, 1, 0, 0};
+    conv.push_back(case1);
+    conv.push_back(case2);
+    conv.push_back(case3);
+    conv.push_back(case4);
+    conv.push_back(case5);
+}
+void convolution_core::conv2x2RIGHT()
+{
+    conv.clear();
+    std::vector<int> case1 = {0, 0, 1, 1};
+    std::vector<int> case2 = {0, 1, 1, 1};
+    std::vector<int> case3 = {0, 1, 0, 1};
+    std::vector<int> case4 = {1, 1, 0, 1};
+    std::vector<int> case5 = {1, 1, 0, 0};
+    conv.push_back(case1);
+    conv.push_back(case2);
+    conv.push_back(case3);
+    conv.push_back(case4);
+    conv.push_back(case5);
+}
 /*
     #############################################
     ###

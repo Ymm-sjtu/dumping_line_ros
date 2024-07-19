@@ -99,6 +99,8 @@ class convolution_core{
         void recore(const int _size, const int _position);
         void conv2x2UP();
         void conv2x2DOWN();
+        void conv2x2LEFT();
+        void conv2x2RIGHT();
 };
 
 class convolution{
@@ -159,7 +161,7 @@ class convolution{
         bool computeRotatedLineEquation(const geometry_msgs::Pose& pose, double rotation_angle, double& k, double& b);
         void getNearbyIndex2x2(const int, std::vector<int> *, const int, const int,const int);
         int getNearbyValue(const int data1, const int threshold);
-        int getRelativePosi(const int index, const int dimension);
+        int getRelativePosi();
         int getLeaderInCore(const int index, const int dimension);
         void getNearbyValues(const int ,const std::vector<int> *, std::vector<int> *);
         int getIndex(const geometry_msgs::Point _point);
