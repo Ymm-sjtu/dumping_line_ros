@@ -38,7 +38,7 @@ convolution::convolution()
     grid.header.frame_id = "null";
 
     //sub and pub function
-    sub_map = nh.subscribe<nav_msgs::OccupancyGrid>("/map", 1, &convolution::callbackSubGrid, this);
+    sub_map = nh.subscribe<nav_msgs::OccupancyGrid>("/map_erode_dilate", 1, &convolution::callbackSubGrid, this);
     sub_vehicle_pose = nh.subscribe<geometry_msgs::PoseStamped>("/start_pose_in_grd",1, &convolution::callbackSubVehiclePose, this);
     //进排土场的起点
     sub_recommend_pose = nh.subscribe<geometry_msgs::PoseStamped>("/recommend_grd", 1, &convolution::callbackSubRecommendPose, this);

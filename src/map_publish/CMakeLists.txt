@@ -9,8 +9,12 @@ project(map_publish)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
   roscpp
+  std_msgs
   nav_msgs
+  cv_bridge
 )
+
+find_package(OpenCV REQUIRED)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -101,11 +105,15 @@ find_package(catkin REQUIRED COMPONENTS
 ## LIBRARIES: libraries you create in this project that dependent projects also need
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
-catkin_package(
+# catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES tf_update
 #  CATKIN_DEPENDS roscpp tf
 #  DEPENDS system_lib
+# )
+catkin_package(
+  CATKIN_DEPENDS roscpp std_msgs nav_msgs cv_bridge
+  DEPENDS OpenCV
 )
 
 ###########
@@ -117,6 +125,7 @@ catkin_package(
 include_directories(
   include
   ${catkin_INCLUDE_DIRS}
+  ${OpenCV_INCLUDE_DIRS}
 )
 
 ## Declare a C++ library
@@ -132,7 +141,7 @@ include_directories(
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
-add_executable(${PROJECT_NAME}_node src/json_test.cpp)
+add_executable(${PROJECT_NAME}_node src/main.cpp src/MapPublisher.cpp)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -149,7 +158,12 @@ target_link_libraries(
   ${PROJECT_NAME}_node
   jsoncpp
   ${catkin_LIBRARIES}
+  ${OpenCV_LIBRARIES}
 )
+# target_link_libraries(gridmap_process 
+#   ${catkin_LIBRARIES}
+#   ${OpenCV_LIBRARIES}
+# )
 
 #############
 ## Install ##
