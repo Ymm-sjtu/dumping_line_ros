@@ -1,5 +1,8 @@
 #include <ros/ros.h>
 #include "dumping_line_detection/convolution_core.h"
+#include "dumping_line_detection/PointProcess.h"
+#include "dumping_line_detection/BSpline.h"
+#include <fstream>
 
 namespace convolution_ns{
     
@@ -38,7 +41,7 @@ convolution::convolution()
     grid.header.frame_id = "null";
 
     //sub and pub function
-    sub_map = nh.subscribe<nav_msgs::OccupancyGrid>("/map_erode_dilate", 1, &convolution::callbackSubGrid, this);
+    sub_map = nh.subscribe<nav_msgs::OccupancyGrid>("/map_open", 1, &convolution::callbackSubGrid, this);
     sub_vehicle_pose = nh.subscribe<geometry_msgs::PoseStamped>("/start_pose_in_grd",1, &convolution::callbackSubVehiclePose, this);
     //进排土场的起点
     sub_recommend_pose = nh.subscribe<geometry_msgs::PoseStamped>("/recommend_grd", 1, &convolution::callbackSubRecommendPose, this);
@@ -70,6 +73,8 @@ void convolution::main_loop()
 
             vehicle_posi_index = getIndex(vehicle_position);
 
+            grid = grid_after_cut;
+        
             bool ifCleaned = getOrientedAreaInGrid(0.02);//函数前后只有grid发生了变化
 
             //卷积算法
@@ -79,7 +84,7 @@ void convolution::main_loop()
             ROS_INFO("Time cost fot map convolution = %f ms", convolutionCostTime*1000);
             pub_grid_after_conv.publish(grid_after_conv);//保留挡墙内边缘
 
-            bSplinePlanning b_spliner(3, quniform, grid_after_conv, 0, 100);
+            PointProcess b_spliner(5, quniform, grid_after_conv, 0, 100 , min_left_index, min_right_index);
             pub_marker_b_spline.publish(b_spliner.marker_line);
             //排土线
 
@@ -183,11 +188,15 @@ bool convolution::cutGridMap()
     geometry_msgs::Point newPos = getNewPosition(initial_pose, 5);
 
     //计算旋转后的直线方程
-    double rotation_angle = 60.0 * M_PI / 180.0;  // 转换为弧度
+    double rotation_angle_right = 90.0 * M_PI / 180.0;  // 转换为弧度
+    double rotation_angle_left = (-70.0) * M_PI / 180.0;  // 转换为弧度
 
     double k_p, k_n, b_p, b_n;
-    bool is_not_vertical_p = computeRotatedLineEquation(oriented_pose, rotation_angle, k_p, b_p); //逆时针为正
-    bool is_not_vertical_n = computeRotatedLineEquation(oriented_pose, -rotation_angle, k_n, b_n);//顺时针为负
+    double min_left_abs = 100.0, min_right_abs = 100.0;
+    double left_abs = 0.0, right_abs = 0.0;
+    
+    bool is_not_vertical_p = computeRotatedLineEquation(oriented_pose, rotation_angle_right, k_p, b_p); //逆时针为正
+    bool is_not_vertical_n = computeRotatedLineEquation(oriented_pose, rotation_angle_left, k_n, b_n);//顺时针为负
     
     //计算位姿方向上的点，带入直线方程后的正负
     bool flag_p, flag_n;
@@ -229,6 +238,37 @@ bool convolution::cutGridMap()
             }
         }
     }
+
+    for (int i = 0; i < height; ++i) {
+        for (int j = 0; j < width; ++j) {
+            // 计算栅格在数据数组中的索引
+            int index = i * width + j;
+            //找到grid_after_cut中带入直线方程后绝对值最小的栅格点
+            if(grid_after_cut.data[index] == 100)
+            {
+                left_abs = std::abs(i - k_n*j - b_n);
+                right_abs = std::abs(i - k_p*j - b_p);
+                if(left_abs < min_left_abs)
+                {
+                    min_left_abs = left_abs;
+                    min_left_index = index;
+                }
+                if(right_abs < min_right_abs)
+                {
+                    min_right_abs = right_abs;
+                    min_right_index = index;
+                }
+            }
+        }
+    }
+    // int min_left_x = min_left_index % width;
+    // int min_left_y = min_left_index / width;
+    // int min_right_x = min_right_index % width;
+    // int min_right_y = min_right_index / width;
+    // std::cout << " =========================== "  << std::endl;
+    // std::cout << "min_left_x = " << min_left_x << " min_left_y = " << min_left_y << std::endl;
+    // std::cout << "min_right_x = " << min_right_x << " min_right_y = " << min_right_y << std::endl;
+
     return true;
 }
 

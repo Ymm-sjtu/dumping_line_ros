@@ -8,24 +8,22 @@
 #include <jsoncpp/json/json.h>
 #include <string>
 #include <opencv2/opencv.hpp>
-#include <iostream>
 
 class MapPublisher {
 public:
     MapPublisher(const std::string& json_file_path); // 构造函数，接收JSON文件路径
     void publishMap(); // 发布地图的公共接口
-    void publishMapAfterErodeDilate(); // 发布腐蚀后的地图的公共接口
-    void publishMapAfterDilate(); // 发布膨胀后的地图的公共接口
+    void publishMapAfterOpenClose(); // 发布开运算、闭运算后的地图的公共接口
 
 private:
     float origin_x, origin_y; // 地图原点
     ros::NodeHandle nh;
     ros::Publisher map_pub;
-    ros::Publisher map_pub_after_erode_dilate;
-    ros::Publisher map_pub_after_dilate;
+    ros::Publisher map_pub_after_open_close;
+    ros::Publisher map_pub_after_open;
     nav_msgs::OccupancyGrid occupancy_grid;
-    nav_msgs::OccupancyGrid occupancy_grid_after_erode_dilate;
-    nav_msgs::OccupancyGrid occupancy_grid_after_dilate;
+    nav_msgs::OccupancyGrid occupancy_grid_after_open_close;
+    nav_msgs::OccupancyGrid occupancy_grid_after_open;
     cv::Mat cv_gridmap;
 
     void processJson(const Json::Value& data); // 处理JSON的私有函数

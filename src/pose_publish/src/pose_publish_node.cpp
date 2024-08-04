@@ -23,22 +23,22 @@ int main(int argc, char **argv)
         recommend_pose.header.stamp = now;
 
         // 为 /start_pose_in_grd 设置姿态
-        start_pose.pose.position.x = (-146.013+414.532);
-        start_pose.pose.position.y = (915.545-734.578);
+        start_pose.pose.position.x = (-134.635+473.683);
+        start_pose.pose.position.y = (878.316-679.469);
         start_pose.pose.position.z = 0.0;
         start_pose.pose.orientation.x = 0.0;
         start_pose.pose.orientation.y = 0.0;
-        start_pose.pose.orientation.z = 0.707;
-        start_pose.pose.orientation.w = 0.707;
+        start_pose.pose.orientation.z = 0.783;
+        start_pose.pose.orientation.w = 0.622;
 
         // 为 /recommend_grd 设置不同的姿态
-        recommend_pose.pose.position.x = (-146.013+414.532);
-        recommend_pose.pose.position.y = (915.545-734.578);
+        recommend_pose.pose.position.x = (-134.635+473.683);
+        recommend_pose.pose.position.y = (878.316-679.469);
         recommend_pose.pose.position.z = 0.0;
         recommend_pose.pose.orientation.x = 0.0;
         recommend_pose.pose.orientation.y = 0.0;
-        recommend_pose.pose.orientation.z = 0.707;
-        recommend_pose.pose.orientation.w = 0.707;
+        recommend_pose.pose.orientation.z = 0.783;
+        recommend_pose.pose.orientation.w = 0.622;
 
         // 分别发布到两个话题
         start_pose_pub.publish(start_pose);

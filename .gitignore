@@ -111,5 +111,6 @@ CATKIN_IGNORE
 # Other ignores
 *.zip
 *.csv
+.cache/
 
 # End of https://www.toptal.com/developers/gitignore/api/ros,c++,visualstudiocode

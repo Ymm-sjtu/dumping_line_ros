@@ -7,8 +7,8 @@
 MapPublisher::MapPublisher(const std::string& json_file_path) {
     // 初始化ROS发布者
     map_pub = nh.advertise<nav_msgs::OccupancyGrid>("map", 10);
-    map_pub_after_erode_dilate = nh.advertise<nav_msgs::OccupancyGrid>("map_erode_dilate", 10);
-    map_pub_after_dilate = nh.advertise<nav_msgs::OccupancyGrid>("map_dilate", 10);
+    map_pub_after_open_close = nh.advertise<nav_msgs::OccupancyGrid>("map_open_close", 10);
+    map_pub_after_open = nh.advertise<nav_msgs::OccupancyGrid>("map_open", 10);
 
     // 读取JSON文件
     std::ifstream json_file(json_file_path);
@@ -186,33 +186,27 @@ void MapPublisher::publishMap() {
     map_pub.publish(occupancy_grid);
 }
 
-void MapPublisher::publishMapAfterDilate(){
+void MapPublisher::publishMapAfterOpenClose(){
     // 将OccupancyGrid转换为cv::Mat
     occupancyGridToMat(occupancy_grid);
 
-    // 膨胀
-    Dilate(cv_gridmap);
+    //先腐蚀后膨胀，去除内凹点
+    Erode(cv_gridmap);  // 腐蚀
+    Dilate(cv_gridmap); // 膨胀
+ 
+    // 将cv::Mat转换为OccupancyGrid
+    MatToOccupancyGrid(cv_gridmap, occupancy_grid_after_open);
+
+    // 发布开运算后的地图
+    map_pub_after_open.publish(occupancy_grid_after_open);
+
+    //先膨胀后腐蚀，去除外凸点
+    Dilate(cv_gridmap); // 膨胀
+    Erode(cv_gridmap);  // 腐蚀
 
     // 将cv::Mat转换为OccupancyGrid
-    MatToOccupancyGrid(cv_gridmap, occupancy_grid_after_dilate);
+    MatToOccupancyGrid(cv_gridmap, occupancy_grid_after_open_close);
 
-    // 发布腐蚀后的地图
-    map_pub_after_dilate.publish(occupancy_grid_after_dilate);
-}
-
-void MapPublisher::publishMapAfterErodeDilate(){
-    // 将OccupancyGrid转换为cv::Mat
-    occupancyGridToMat(occupancy_grid);
-
-    // 腐蚀
-    Erode(cv_gridmap);
-
-    // 膨胀
-    Dilate(cv_gridmap);
-
-    // 将cv::Mat转换为OccupancyGrid
-    MatToOccupancyGrid(cv_gridmap, occupancy_grid_after_erode_dilate);
-
-    // 发布膨胀后的地图
-    map_pub_after_erode_dilate.publish(occupancy_grid_after_erode_dilate);
+    // 发布开运算及闭运算后的地图
+    map_pub_after_open_close.publish(occupancy_grid_after_open_close);
 }

@@ -33,8 +33,10 @@ include_directories(
   ${EIGEN3_INCLUDE_DIR}
 )
 
+file(GLOB_RECURSE ALL_SOURCE_FILES src/*.cpp)
+
 ## 添加可执行文件
-add_executable(${PROJECT_NAME}_node src/main.cpp src/convolution_core.cpp src/b_spline.cpp src/TSPSolver.cpp)
+add_executable(${PROJECT_NAME}_node ${ALL_SOURCE_FILES})
 
 ## 添加依赖库
 target_link_libraries(${PROJECT_NAME}_node

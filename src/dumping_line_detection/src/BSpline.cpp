@@ -1,4 +1,6 @@
-#include "dumping_line_detection/b_spline.h"
+#include "dumping_line_detection/BSpline.h"
+#include "ros/assert.h"
+#include "ros/rate.h"
 
 Bspline::Bspline(int _k, int _type, vector<Point> _p)
 {
@@ -63,15 +65,6 @@ Bspline::~Bspline()
 	p.clear();
 	u.clear();
 	pTrack.clear();
-}
-
-void Bspline::delay(int time) //延时函数，单位ms
-{
-	clock_t  now = clock();
-	while (clock() - now < time)
-	{
-
-	}
 }
 
 double Bspline::BsplineBfunc(int i, int k, double uu)//计算每个u和每个i对应的B样条
@@ -174,113 +167,6 @@ double Bspline::adaptiveCalDeltaU(double x_now, double y_now, double x_next, dou
 	double dist = sqrt(pow(x_now-x_next,2) + pow(y_now-y_next,2));
 	double this_seg_num = dist/total_dist_* num;
 	return 1/this_seg_num;
-}
-
-bSplinePlanning::bSplinePlanning(const int _scale, const int _type, const nav_msgs::OccupancyGrid _gridPoints, const int _lower_limit, const int _upper_limit)
-{
-	scale = _scale;
-	type = _type;
-	origiGrid = _gridPoints;
-	low_limit = _lower_limit;
-	up_limit = _upper_limit;
-	// ros::param::get("simple_sample_scale", simple_sample_scale);
-
-	//Visualization Initializaion
-	marker_line.points.clear();
-	marker_line.header.frame_id = "map";
-	marker_line.header.stamp = ros::Time::now();
-	marker_line.ns = "bspline";
-	marker_line.id = 4;
-	marker_line.type = visualization_msgs::Marker::LINE_STRIP;
-	marker_line.action = visualization_msgs::Marker::ADD;
-	marker_line.scale.x = 0.1;
-	// marker_lines.scale.y = 10;
-	// marker_lines.scale.z = 10;
-	marker_line.color.r = 1.0f;
-	marker_line.color.g = 0.4f;
-	marker_line.color.b = 0.22f;
-	marker_line.color.a = 1;
-
-	ros::Rate rsleep(6);
-
-	getOrigiPointsFromGridPoints(_gridPoints, _upper_limit, _lower_limit);
-	if(origiPoints.size() >= 3 )
-	{	
-		Bspline bSpliner(_scale, _type, origiPoints);
-		bSpliner.creatBspline();
-		trackPoints = bSpliner.pTrack;
-	}
-	geometry_msgs::Point temp_point;
-	trackPointsVec.clear();
-	for(int j = 0; j < trackPoints.size(); j++)
-	{
-		temp_point.x = trackPoints.at(j).x;
-		temp_point.y = trackPoints.at(j).y;
-		temp_point.z = 0;
-		trackPointsVec.push_back(temp_point);
-		marker_line.points.push_back(temp_point);
-	}
-	// ROS_WARN("Sent marker b spline.");
-	// pub_marker_lines.publish(marker_lines);
-	// rsleep.sleep();
-}
-
-std::vector<Point> bSplinePlanning::sortPointsByOrder(const std::vector<Point>& points, const std::vector<int>& order) {
-    std::vector<Point> sortedPoints(order.size());
-    for (size_t i = 0; i < order.size(); ++i) {
-        sortedPoints[i] = points[order[i]];  // 根据给定顺序重新排列点
-    }
-    return sortedPoints;
-}
-
-void bSplinePlanning::getOrigiPointsFromGridPoints(const nav_msgs::OccupancyGrid _gridPoints, int _upper_limit, int _lower_limit)
-{
-	ROS_ASSERT(_upper_limit <=100 && _lower_limit >= 0);
-	origiPoints.clear();
-	Point _point;
-	int _data;
-	int _width = _gridPoints.info.width;
-	int _height = _gridPoints.info.height;
-	float _resolution = _gridPoints.info.resolution;
-	float _x_0 = _gridPoints.info.origin.position.x;
-	float _y_0 = _gridPoints.info.origin.position.y;
-
-	int loop = 0;
-	
-	gridForVisualization.header = _gridPoints.header;
-	gridForVisualization.info = _gridPoints.info;
-	gridForVisualization.data.clear();
-	gridForVisualization.data.resize(_gridPoints.data.size(), 0);
-	int num = 0;
-	for(int i = 0; i < _gridPoints.data.size(); i++)
-	{
-		_data = _gridPoints.data.at(i);
-		if(_data > _lower_limit && _data <= _upper_limit )
-		{
-			gridForVisualization.data.at(i) = -100;
-			loop++;
-			if(loop % simple_sample_scale == 0)
-			{
-				_point.x = (i % _width)*_resolution+0.5*_resolution + _x_0;
-				_point.y = static_cast<int>(i/_width)*_resolution+0.5*_resolution + _y_0;
-				origiPoints.push_back(_point);
-				loop = 0;
-				std::cout << num << " " << _point.x << " " << _point.y << std::endl;
-				num++;
-			}
-		}
-	}
-	TSPSolver solver;
-	solver.setPoints(origiPoints);
-    auto result = solver.findBestGreedyStart();
-	origiPoints = sortPointsByOrder(origiPoints, result.second);
-
-	num = 0;
-	for (const auto& p : origiPoints) {
-        std::cout << num << " " << p.x << " " << p.y << std::endl;
-		num++;
-    }
-	
 }
 
 

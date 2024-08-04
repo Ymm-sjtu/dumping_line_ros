@@ -2,15 +2,11 @@
 #define _CONVOLUTION_METHOD
 
 #include <ros/ros.h>
-#include <iostream>
 #include <cmath>
 #include <vector>
-#include <algorithm>
 #include <eigen3/Eigen/Core>
 #include <eigen3/Eigen/Dense>
 #include <eigen3/Eigen/SVD>
-
-#include "dumping_line_detection/b_spline.h"
 
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/Pose.h>
@@ -29,9 +25,7 @@
 
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
-#include <fstream>  // 包含文件操作的库
-#include <chrono>
-#include <thread>
+
 
 namespace convolution_ns{
 #define THREE 3
@@ -118,6 +112,9 @@ class convolution{
         nav_msgs::OccupancyGrid grid_after_found;
         //Store a continuous grid map obtained by using the grid points found in the recommended pose direction as seed points
         bool ifSubGrid = false;
+
+        //Grid Map after Cut
+        int min_left_index = 0, min_right_index = 0;
 
         //订阅车体信息
         geometry_msgs::Point vehicle_position;
