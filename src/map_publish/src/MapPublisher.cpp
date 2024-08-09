@@ -4,14 +4,15 @@
 #include <fstream>
 #include <iostream>
 
-MapPublisher::MapPublisher(const std::string& json_file_path) {
+MapPublisher::MapPublisher() {
     // 初始化ROS发布者
     map_pub = nh.advertise<nav_msgs::OccupancyGrid>("map", 10);
     map_pub_after_open_close = nh.advertise<nav_msgs::OccupancyGrid>("map_open_close", 10);
     map_pub_after_open = nh.advertise<nav_msgs::OccupancyGrid>("map_open", 10);
 
+    std::string map_path = getMapPath("/home/ymm/dumping_line_ws/config.json");
     // 读取JSON文件
-    std::ifstream json_file(json_file_path);
+    std::ifstream json_file(map_path);
     Json::Reader reader;
     Json::Value root;
     if (!reader.parse(json_file, root, false)) {
@@ -46,6 +47,23 @@ MapPublisher::MapPublisher(const std::string& json_file_path) {
 
     // 根据JSON文件中的data数组更新地图数据
     processJson(root["data"]);
+}
+
+// Function to read and parse the JSON file
+std::string MapPublisher::getMapPath(const std::string& filename) {
+    std::ifstream json_file(filename);
+    Json::Reader reader;
+    Json::Value root;
+
+    if (!reader.parse(json_file, root, false)) {
+        ROS_ERROR("Failed to parse the JSON file.");
+        exit(1);
+    }
+
+    // Extract data from the JSON
+    std::string map_path = root["map_path"].asString();
+
+    return map_path;
 }
 
 void MapPublisher::processJson(const Json::Value& data) {

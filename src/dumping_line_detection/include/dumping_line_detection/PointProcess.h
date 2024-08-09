@@ -18,7 +18,7 @@ class PointProcess
 		~PointProcess(){};
 
 		visualization_msgs::Marker marker_line;
-		nav_msgs::OccupancyGrid gridForVisualization;
+		nav_msgs::OccupancyGrid gridAfterDfs;
 		
 	private:
 		int scale = 0;
@@ -32,6 +32,8 @@ class PointProcess
 		ros::NodeHandle nh;
 		// std::vector<Point> sampledPoints;//稀疏采样后的点集
 	
+		nav_msgs::OccupancyGrid maxAreaOccupancyGrid(const nav_msgs::OccupancyGrid& grid);
+		int dfs(std::vector<int8_t>& gridData, int x, int y, int width, int height, int index, std::vector<std::pair<int, int>>& islandIndices);
 		std::vector<Point> sortPointsByOrder(const std::vector<Point>& points, const std::vector<int>& order);
 		void getOrigiPointsFromGridPoints(const nav_msgs::OccupancyGrid _gridPoints, const int _upper_limit, const int _lower_limit, const int _min_left_index, const int _min_right_index);
 		double euclideanDistance(const Point& p1, const Point& p2);

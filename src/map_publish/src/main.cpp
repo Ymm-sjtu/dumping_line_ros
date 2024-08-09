@@ -12,10 +12,10 @@ int main(int argc, char** argv) {
     //     return 1;
     // }
 
-    // std::string json_file_path = argv[1];
-    std::string json_file_path = "/home/ymm/dumping_line_ws/src/map_publish/json/L1(2).json";
 
-    MapPublisher mapPublisher(json_file_path);
+    // std::string json_file_path = argv[1];
+
+    MapPublisher mapPublisher;
     ros::Rate loop_rate(1); // 1 Hz
 
     while (ros::ok()) {

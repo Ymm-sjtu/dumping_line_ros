@@ -1,8 +1,10 @@
+#include <jsoncpp/json/reader.h>
 #include <ros/ros.h>
 #include "dumping_line_detection/convolution_core.h"
 #include "dumping_line_detection/PointProcess.h"
 #include "dumping_line_detection/BSpline.h"
 #include <fstream>
+
 
 namespace convolution_ns{
     
@@ -42,19 +44,42 @@ convolution::convolution()
 
     //sub and pub function
     sub_map = nh.subscribe<nav_msgs::OccupancyGrid>("/map_open", 1, &convolution::callbackSubGrid, this);
-    sub_vehicle_pose = nh.subscribe<geometry_msgs::PoseStamped>("/start_pose_in_grd",1, &convolution::callbackSubVehiclePose, this);
-    //进排土场的起点
-    sub_recommend_pose = nh.subscribe<geometry_msgs::PoseStamped>("/recommend_grd", 1, &convolution::callbackSubRecommendPose, this);
-    //大致（推荐）停车方向
 
     pub_grid_after_cut = nh.advertise<nav_msgs::OccupancyGrid>("/map_cut", 1);
     pub_grid_after_conv = nh.advertise<nav_msgs::OccupancyGrid>("/map_convolution", 1);
     pub_fitted_points = nh.advertise<visualization_msgs::Marker>("/fitted_points", 1);
     pub_marker_b_spline = nh.advertise<visualization_msgs::Marker>("/marker_b_spline", 1);
+    pub_grid_after_dfs = nh.advertise<nav_msgs::OccupancyGrid>("/map_dfs", 1);
 
     //test
     pub_grid_after_found = nh.advertise<nav_msgs::OccupancyGrid>("/map_found", 1);
 }
+
+// Function to read and parse the JSON file
+bool convolution::parseJsonFile(const string& filename) {
+    std::ifstream json_file(filename);
+    Json::Reader reader;
+    Json::Value root;
+
+    if (!reader.parse(json_file, root, false)) {
+        ROS_ERROR("Failed to parse the JSON file.");
+        return false;
+    }
+
+    // Extract data from the JSON
+    recommend_pose.position.x = root["pose"]["position"]["x"].asDouble();
+    recommend_pose.position.y = root["pose"]["position"]["y"].asDouble();
+    recommend_pose.position.z = root["pose"]["position"]["z"].asDouble();
+    recommend_pose.orientation.x = root["pose"]["orientation"]["x"].asDouble();
+    recommend_pose.orientation.y = root["pose"]["orientation"]["y"].asDouble();
+    recommend_pose.orientation.z = root["pose"]["orientation"]["z"].asDouble();
+    recommend_pose.orientation.w = root["pose"]["orientation"]["w"].asDouble();
+    
+    angle_right = root["angles"]["angle_right"].asDouble();
+    angle_left = root["angles"]["angle_left"].asDouble();
+    return true;
+}
+
 
 void convolution::main_loop()
 {
@@ -64,9 +89,13 @@ void convolution::main_loop()
     while(ros::ok())
     {
         ros::spinOnce();//此处执行回调函数
-        if(grid.header.frame_id != "null" && ifSubVehiclePose && ifGetRcmdPose && ifSubGrid)
+        bool ifReadJson = parseJsonFile("/home/ymm/dumping_line_ws/config.json");
+        if(grid.header.frame_id != "null" && ifSubGrid && ifReadJson)
         {
+            recommend_pose.position.x -= grid.info.origin.position.x;
+            recommend_pose.position.y -= grid.info.origin.position.y;
             ROS_INFO("Receive ALL : Convolution Process Start.");
+
             //cut the grid map
             ROS_ASSERT_MSG(cutGridMap() == true,"Please select a recommended posture again");
             pub_grid_after_cut.publish(grid_after_cut);
@@ -84,13 +113,14 @@ void convolution::main_loop()
             ROS_INFO("Time cost fot map convolution = %f ms", convolutionCostTime*1000);
             pub_grid_after_conv.publish(grid_after_conv);//保留挡墙内边缘
 
-            PointProcess b_spliner(5, quniform, grid_after_conv, 0, 100 , min_left_index, min_right_index);
-            pub_marker_b_spline.publish(b_spliner.marker_line);
+            PointProcess process(5, quniform, grid_after_conv, 0, 100 , min_left_index, min_right_index);
+            pub_grid_after_dfs.publish(process.gridAfterDfs);
+            pub_marker_b_spline.publish(process.marker_line);
             //排土线
 
             ROS_INFO("marker_line success");
 
-            normalFitSequence fitter(b_spliner.trackPointsVec, vehicle_position, 60);//计算出拟合于线上的点集，存于成员函数poses中
+            normalFitSequence fitter(process.trackPointsVec, vehicle_position, 60);//计算出拟合于线上的点集，存于数据成员poses中
 
             // 拟合点集可视化
             fitted_points.points.clear();
@@ -102,13 +132,10 @@ void convolution::main_loop()
             std::string file_name = "/home/ymm/dumping_line_ws/points.csv";  // 定义要保存的文件名
             fitter.savePointsToFile(fitted_points, file_name);  // 调用函数，保存点到文件
 
-            if(ifGetRcmdPose)
-            {
-                ROS_INFO("Succeed in Making Sure GOUND PARK POSITION.");
+            ROS_INFO("Succeed in Making Sure GOUND PARK POSITION.");
                 
-                //程序复位
-                reset();
-            }
+            //程序复位
+            reset();
         }
         sleep.sleep();
     }
@@ -184,19 +211,19 @@ bool convolution::computeRotatedLineEquation(const geometry_msgs::Pose& pose, do
 bool convolution::cutGridMap()
 {
     
-    geometry_msgs::Pose initial_pose = oriented_pose;
+    geometry_msgs::Pose initial_pose = recommend_pose;
     geometry_msgs::Point newPos = getNewPosition(initial_pose, 5);
 
     //计算旋转后的直线方程
-    double rotation_angle_right = 90.0 * M_PI / 180.0;  // 转换为弧度
-    double rotation_angle_left = (-70.0) * M_PI / 180.0;  // 转换为弧度
+    double rotation_angle_right = angle_right * M_PI / 180.0;  // 转换为弧度
+    double rotation_angle_left = angle_left * M_PI / 180.0;  // 转换为弧度
 
     double k_p, k_n, b_p, b_n;
     double min_left_abs = 100.0, min_right_abs = 100.0;
     double left_abs = 0.0, right_abs = 0.0;
     
-    bool is_not_vertical_p = computeRotatedLineEquation(oriented_pose, rotation_angle_right, k_p, b_p); //逆时针为正
-    bool is_not_vertical_n = computeRotatedLineEquation(oriented_pose, rotation_angle_left, k_n, b_n);//顺时针为负
+    bool is_not_vertical_p = computeRotatedLineEquation(recommend_pose, rotation_angle_right, k_p, b_p); //逆时针为正
+    bool is_not_vertical_n = computeRotatedLineEquation(recommend_pose, rotation_angle_left, k_n, b_n);//顺时针为负
     
     //计算位姿方向上的点，带入直线方程后的正负
     bool flag_p, flag_n;
@@ -204,7 +231,7 @@ bool convolution::cutGridMap()
         std::cout << "逆时针旋转后的直线方程: y = " << k_p << " * x + " << b_p << std::endl;
         flag_p = ((newPos.y - k_p*newPos.x - b_p) > 0)? 1:0;
     } else {
-        std::cout << "逆时针旋转后的直线方程: x = " << oriented_pose.position.x << std::endl;
+        std::cout << "逆时针旋转后的直线方程: x = " << recommend_pose.position.x << std::endl;
         return false;
     }
 
@@ -212,7 +239,7 @@ bool convolution::cutGridMap()
         std::cout << "顺时针旋转后的直线方程: y = " << k_n << " * x + " << b_n << std::endl;
         flag_n = ((newPos.y - k_n*newPos.x - b_n) > 0)? 1:0;
     } else {
-        std::cout << "顺时针旋转后的直线方程: x = " << oriented_pose.position.x << std::endl;
+        std::cout << "顺时针旋转后的直线方程: x = " << recommend_pose.position.x << std::endl;
         return false;
     }
 
@@ -290,14 +317,14 @@ bool convolution::cutGridMap()
  */
 bool convolution::getOrientedAreaInGrid(const float step_dist)
 {
-    geometry_msgs::Point temp_point = oriented_pose.position;
+    geometry_msgs::Point temp_point = recommend_pose.position;
 
     std::vector<int> active_vec;
     std::vector<int> nearby_indexes;
     std::vector<int> final_indexes;
 
     int temp_index = 0;
-    float yaw = tf::getYaw(oriented_pose.orientation);
+    float yaw = tf::getYaw(recommend_pose.orientation);
     // ROS_INFO("yaw = %f", yaw);
     bool findPoint = false;
     bool overflow = false;
@@ -583,7 +610,7 @@ void convolution::calcConvolution2x2()
 */
 int convolution::getRelativePosi()
 {
-    float yaw = tf::getYaw(oriented_pose.orientation);
+    float yaw = tf::getYaw(recommend_pose.orientation);
     if(yaw > M_PI || yaw < -M_PI)
     {
         yaw = yaw - 2*M_PI*static_cast<int>(yaw/(2*M_PI));
@@ -749,8 +776,6 @@ void convolution::reset()
 {
     grid.data.clear();
     grid.header.frame_id = "null";
-    ifSubVehiclePose = false;
-    ifGetRcmdPose = false;
 }
 
 
@@ -768,14 +793,21 @@ void convolution::calcConvolution3x3()
     ###################################
 */
 
-void convolution::callbackSubRecommendPose(const geometry_msgs::PoseStamped recommendPose)
-{
-    ROS_INFO("Received: Get the Recommended Pose In GRD.");
-    recommend_pose = recommendPose.pose;
-    oriented_pose.position = recommendPose.pose.position;
-    oriented_pose.orientation = tf::createQuaternionMsgFromYaw(M_PI + tf::getYaw(recommendPose.pose.orientation));
-    ifGetRcmdPose = true;
-}
+// void convolution::callbackSubRecommendPose(const geometry_msgs::PoseStamped recommendPose)
+// {
+//     ROS_INFO("Received: Get the Recommended Pose In GRD.");
+//     recommend_pose = recommendPose.pose;
+//     recommend_pose.position = recommendPose.pose.position;
+//     recommend_pose.orientation = tf::createQuaternionMsgFromYaw(M_PI + tf::getYaw(recommendPose.pose.orientation));
+//     ifGetRcmdPose = true;
+// }
+
+// void convolution::callbackSubVehiclePose(const geometry_msgs::PoseStamped vehiclePose)
+// {
+//     ROS_INFO("Received: Get the Start Pose | Vehicle Pose In GRD.");
+//     vehicle_position = vehiclePose.pose.position;
+//     ifSubVehiclePose = true;
+// }
 
 void convolution::callbackSubGrid(const nav_msgs::OccupancyGrid _gridData)
 {
@@ -796,13 +828,6 @@ void convolution::callbackSubGrid(const nav_msgs::OccupancyGrid _gridData)
 
     ifSubGrid = true;
 
-}
-
-void convolution::callbackSubVehiclePose(const geometry_msgs::PoseStamped vehiclePose)
-{
-    ROS_INFO("Received: Get the Start Pose | Vehicle Pose In GRD.");
-    vehicle_position = vehiclePose.pose.position;
-    ifSubVehiclePose = true;
 }
 
 /*
@@ -831,7 +856,7 @@ normalFitSequence::normalFitSequence(std::vector<geometry_msgs::Point> _points, 
         first = _points.begin() + i;
         end = _points.begin() + i + _num;
         std::vector<geometry_msgs::Point> active_points(first, end);
-
+        
         //拟合计算点
         // _temp_pose = circleFit(active_points, _origin);
         _temp_pose = linearFit(active_points, _origin);

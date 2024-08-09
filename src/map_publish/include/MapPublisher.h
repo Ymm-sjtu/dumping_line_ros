@@ -11,7 +11,7 @@
 
 class MapPublisher {
 public:
-    MapPublisher(const std::string& json_file_path); // 构造函数，接收JSON文件路径
+    MapPublisher(); // 构造函数，接收JSON文件路径
     void publishMap(); // 发布地图的公共接口
     void publishMapAfterOpenClose(); // 发布开运算、闭运算后的地图的公共接口
 
@@ -26,6 +26,7 @@ private:
     nav_msgs::OccupancyGrid occupancy_grid_after_open;
     cv::Mat cv_gridmap;
 
+    std::string getMapPath(const std::string& filename);
     void processJson(const Json::Value& data); // 处理JSON的私有函数
     void processJsonWithIndex(const Json::Value& data); // 处理有索引的JSON数据
     void processJsonWithoutIndex(const Json::Value& data); // 处理无索引的JSON数据

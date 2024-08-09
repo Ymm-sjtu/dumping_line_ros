@@ -1,6 +1,5 @@
 #include "dumping_line_detection/BSpline.h"
-#include "ros/assert.h"
-#include "ros/rate.h"
+#include <iostream>
 
 Bspline::Bspline(int _k, int _type, vector<Point> _p)
 {

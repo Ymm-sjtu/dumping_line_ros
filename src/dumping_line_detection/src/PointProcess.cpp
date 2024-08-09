@@ -1,6 +1,7 @@
 #include "dumping_line_detection/PointProcess.h"
-#include "dumping_line_detection/BSpline.h"
+// #include "dumping_line_detection/BSpline.h"
 #include "dumping_line_detection/Bezier.h"
+#include <iostream>
 
 PointProcess::PointProcess(const int _scale, const int _type, const nav_msgs::OccupancyGrid _gridPoints, const int _lower_limit, const int _upper_limit, const int _min_left_index, const int _min_right_index)
 {
@@ -43,7 +44,7 @@ PointProcess::PointProcess(const int _scale, const int _type, const nav_msgs::Oc
 	}
 	geometry_msgs::Point temp_point;
 	trackPointsVec.clear();
-	for(int j = 0; j < trackPoints.size(); j++)
+	for(int j = 10; j < trackPoints.size()-10; j++)
 	{
 		temp_point.x = trackPoints.at(j).x;
 		temp_point.y = trackPoints.at(j).y;
@@ -101,8 +102,8 @@ void PointProcess::cutGridPoints(const nav_msgs::OccupancyGrid _gridPoints, cons
 	size_t left_index = findClosestPointIndex(origiPoints, left_point);
 	size_t right_index = findClosestPointIndex(origiPoints, right_point);
 
-	std::cout << "======================" << std::endl;
-	std::cout << "left_index " << left_index << " right_index " << right_index << std::endl;
+	std::cout << "--------------------------------" << std::endl;
+	std::cout << "left_index = " << left_index << "; right_index = " << right_index << std::endl;
 
 	//获得origiPoints中min_left和min_right之间的点，还是按照顺序，并且赋给origiPoints
 	std::vector<Point> tempPoints;
@@ -123,6 +124,63 @@ void PointProcess::cutGridPoints(const nav_msgs::OccupancyGrid _gridPoints, cons
 	origiPoints = tempPoints;
 }
 
+ nav_msgs::OccupancyGrid PointProcess::maxAreaOccupancyGrid(const nav_msgs::OccupancyGrid& grid) {
+	if (grid.data.empty()) return grid;
+
+	int width = grid.info.width;
+	int height = grid.info.height;
+	int maxArea = 0;
+	vector<pair<int, int>> maxIslandIndices;
+
+	// Create a copy of the data to manipulate
+	 vector<int8_t> gridData = grid.data;
+	int islandIndex = 2; // Start indexing islands from 2
+
+	for (int y = 0; y < height; ++y) {
+		for (int x = 0; x < width; ++x) {
+			if (gridData[y * width + x] == 100) {
+				vector<pair<int, int>> currentIslandIndices;
+				int area = dfs(gridData, x, y, width, height, islandIndex, currentIslandIndices);
+				if (area > maxArea) {
+					maxArea = area;
+					maxIslandIndices = currentIslandIndices;
+				}
+				++islandIndex; // Increment the index for the next island
+			}
+		}
+	}
+
+	// Create the result OccupancyGrid with only the maximum island
+	nav_msgs::OccupancyGrid resultGrid = grid;
+	resultGrid.data.assign(grid.data.size(), 0); // Initialize all cells to 0
+
+	for (const auto& index : maxIslandIndices) {
+		resultGrid.data[index.second * width + index.first] = 100;
+	}
+
+	return resultGrid;
+}
+
+int PointProcess::dfs(vector<int8_t>& gridData, int x, int y, int width, int height, int index, vector<pair<int, int>>& islandIndices) {
+	if (x < 0 || x >= width || y < 0 || y >= height || gridData[y * width + x] != 100)
+		return 0;
+
+	gridData[y * width + x] = index; // Mark the cell with the current island index
+	islandIndices.push_back({x, y}); // Record the index of the current cell
+	int area = 1;
+
+	// Explore all 8 directions
+	const vector<int> directions = {-1, 0, 1};
+	for (int dx : directions) {
+		for (int dy : directions) {
+			if (dx == 0 && dy == 0) continue; // Skip the cell itself
+			area += dfs(gridData, x + dx, y + dy, width, height, index, islandIndices);
+		}
+	}
+
+	return area;
+}
+
 void PointProcess::getOrigiPointsFromGridPoints(const nav_msgs::OccupancyGrid _gridPoints, const int _upper_limit, const int _lower_limit, const int _min_left_index, const int _min_right_index)
 {
 	ROS_ASSERT(_upper_limit <=100 && _lower_limit >= 0);
@@ -137,17 +195,18 @@ void PointProcess::getOrigiPointsFromGridPoints(const nav_msgs::OccupancyGrid _g
 
 	int loop = 0;
 	
-	gridForVisualization.header = _gridPoints.header;
-	gridForVisualization.info = _gridPoints.info;
-	gridForVisualization.data.clear();
-	gridForVisualization.data.resize(_gridPoints.data.size(), 0);
+	gridAfterDfs = maxAreaOccupancyGrid(_gridPoints);
+	// gridForVisualization.header = _gridPoints.header;
+	// gridForVisualization.info = _gridPoints.info;
+	// gridForVisualization.data.clear();
+	// gridForVisualization.data.resize(_gridPoints.data.size(), 0);
 	int num = 0;
 	for(int i = 0; i < _gridPoints.data.size(); i++)
 	{
-		_data = _gridPoints.data.at(i);
+		_data = gridAfterDfs.data.at(i);
 		if(_data > _lower_limit && _data <= _upper_limit )
 		{
-			gridForVisualization.data.at(i) = -100;
+			// gridForVisualization.data.at(i) = -100;
 			loop++;
 			if(loop % simple_sample_scale == 0)
 			{

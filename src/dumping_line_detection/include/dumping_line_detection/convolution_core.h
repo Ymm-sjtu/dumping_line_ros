@@ -102,7 +102,6 @@ class convolution{
         //Member
         convolution_core core;
 
-        geometry_msgs::Pose oriented_pose;
         geometry_msgs::Pose recommend_pose;
 
         //Map
@@ -113,16 +112,18 @@ class convolution{
         //Store a continuous grid map obtained by using the grid points found in the recommended pose direction as seed points
         bool ifSubGrid = false;
 
+        double angle_right = 0.0;
+        double angle_left = 0.0;
         //Grid Map after Cut
         int min_left_index = 0, min_right_index = 0;
 
         //订阅车体信息
         geometry_msgs::Point vehicle_position;
         int vehicle_posi_index;
-        bool ifSubVehiclePose = false;
+        // bool ifSubVehiclePose = false;
 
         int thres = 80;//栅格阈值
-        bool ifGetRcmdPose = false;
+        // bool ifGetRcmdPose = false;
 
         visualization_msgs::Marker arrow;
         visualization_msgs::Marker fitted_points;
@@ -134,6 +135,7 @@ class convolution{
         ros::Publisher pub_marker_b_spline;
         ros::Publisher pub_grid_after_cut;
         ros::Publisher pub_grid_after_found;
+        ros::Publisher pub_grid_after_dfs;
         
         ros::Subscriber sub_map;
         ros::Subscriber sub_vehicle_pose;
@@ -147,6 +149,7 @@ class convolution{
         // bool conditionA(const std::vector<int> *);
 
         // Process Calculation Function
+        bool parseJsonFile(const std::string& filename);
         std::pair<int, int> convolute(const std::vector<int> *arr);
         void reset();
         bool cutGridMap();

@@ -40,5 +40,6 @@ add_executable(${PROJECT_NAME}_node ${ALL_SOURCE_FILES})
 
 ## 添加依赖库
 target_link_libraries(${PROJECT_NAME}_node
+  jsoncpp
   ${catkin_LIBRARIES}
 )
