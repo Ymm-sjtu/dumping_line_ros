@@ -636,7 +636,7 @@ void convolution_core::recore(const int _scale, const int position)
     if(_scale == 2)
     {   
         conv.clear();
-        std::vector<int> case1, case2, case3, case4, case5, case6, case7;
+        std::vector<int> case1, case2, case3, case4, case5, case6, case7,case8,case9;
         switch(position)
         {
             case UP: 
@@ -647,6 +647,8 @@ void convolution_core::recore(const int _scale, const int position)
                 case5 = {0, 1, 0, 1};
                 case6 = {0, 0, 1, 0};
                 case7 = {0, 0, 0, 1};
+                case8 = {0, 0, 1, 0};
+                case9 = {0, 0, 0, 1};
                 break;
             case DOWN: 
                 case1 = {1, 0, 1, 0};
@@ -656,6 +658,8 @@ void convolution_core::recore(const int _scale, const int position)
                 case5 = {0, 1, 0, 1};
                 case6 = {1, 0, 0, 0};
                 case7 = {0, 1, 0, 0};
+                case8 = {0, 0, 1, 0};
+                case9 = {0, 0, 0, 1};
                 break;
             case LEFT:
                 case1 = {0, 0, 1, 1};
@@ -665,6 +669,8 @@ void convolution_core::recore(const int _scale, const int position)
                 case5 = {1, 1, 0, 0};
                 case6 = {0, 0, 1, 0};
                 case7 = {1, 0, 0, 0};
+                case8 = {0, 1, 0, 0};
+                case9 = {0, 0, 0, 1};
                 break;
             case RIGHT:
                 case1 = {0, 0, 1, 1};
@@ -674,6 +680,8 @@ void convolution_core::recore(const int _scale, const int position)
                 case5 = {1, 1, 0, 0};
                 case6 = {0, 0, 0, 1};
                 case7 = {0, 1, 0, 0};
+                case8 = {1, 0, 0, 0};
+                case9 = {0, 0, 1, 0};
                 break;
         }
         conv.push_back(case1);
@@ -683,6 +691,8 @@ void convolution_core::recore(const int _scale, const int position)
         conv.push_back(case5);
         conv.push_back(case6);
         conv.push_back(case7);
+        conv.push_back(case8);
+        conv.push_back(case9);
     }
 
 }
