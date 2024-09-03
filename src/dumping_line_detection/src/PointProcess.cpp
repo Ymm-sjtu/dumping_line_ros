@@ -2,8 +2,10 @@
 // #include "dumping_line_detection/BSpline.h"
 #include "dumping_line_detection/Bezier.h"
 #include <iostream>
+#include <jsoncpp/json/reader.h>
+#include <fstream>
 
-PointProcess::PointProcess(const int _scale, const int _type, const nav_msgs::OccupancyGrid _gridPoints, const int _lower_limit, const int _upper_limit, const int _min_left_index, const int _min_right_index)
+PointProcess::PointProcess(const int _scale, const int _type, const nav_msgs::OccupancyGrid _gridPoints, const int _lower_limit, const int _upper_limit, const int _first_index, const int _second_index)
 {
 	scale = _scale;
 	type = _type;
@@ -30,7 +32,7 @@ PointProcess::PointProcess(const int _scale, const int _type, const nav_msgs::Oc
 
 	ros::Rate rsleep(6);
 
-	getOrigiPointsFromGridPoints(_gridPoints, _upper_limit, _lower_limit, _min_left_index, _min_right_index);
+	getOrigiPointsFromGridPoints(_gridPoints, _upper_limit, _lower_limit, _first_index, _second_index);
 	if(origiPoints.size() >= 3 )
 	// {	
 	// 	Bspline bSpliner(_scale, _type, origiPoints);
@@ -44,6 +46,8 @@ PointProcess::PointProcess(const int _scale, const int _type, const nav_msgs::Oc
 	}
 	geometry_msgs::Point temp_point;
 	trackPointsVec.clear();
+
+	//todo：后续优化
 	for(int j = 10; j < trackPoints.size()-10; j++)
 	{
 		temp_point.x = trackPoints.at(j).x;
@@ -55,14 +59,6 @@ PointProcess::PointProcess(const int _scale, const int _type, const nav_msgs::Oc
 	// ROS_WARN("Sent marker b spline.");
 	// pub_marker_lines.publish(marker_lines);
 	// rsleep.sleep();
-}
-
-std::vector<Point> PointProcess::sortPointsByOrder(const std::vector<Point>& points, const std::vector<int>& order) {
-    std::vector<Point> sortedPoints(order.size());
-    for (size_t i = 0; i < order.size(); ++i) {
-        sortedPoints[i] = points[order[i]];  // 根据给定顺序重新排列点
-    }
-    return sortedPoints;
 }
 
 // 计算两点之间的欧几里得距离
@@ -102,8 +98,7 @@ void PointProcess::cutGridPoints(const nav_msgs::OccupancyGrid _gridPoints, cons
 	size_t left_index = findClosestPointIndex(origiPoints, left_point);
 	size_t right_index = findClosestPointIndex(origiPoints, right_point);
 
-	std::cout << "--------------------------------" << std::endl;
-	std::cout << "left_index = " << left_index << "; right_index = " << right_index << std::endl;
+	std::cout << "first_index = " << left_index << "; second_index = " << right_index << std::endl;
 
 	//获得origiPoints中min_left和min_right之间的点，还是按照顺序，并且赋给origiPoints
 	std::vector<Point> tempPoints;
@@ -181,7 +176,97 @@ int PointProcess::dfs(vector<int8_t>& gridData, int x, int y, int width, int hei
 	return area;
 }
 
-void PointProcess::getOrigiPointsFromGridPoints(const nav_msgs::OccupancyGrid _gridPoints, const int _upper_limit, const int _lower_limit, const int _min_left_index, const int _min_right_index)
+double PointProcess::getDistanceToLine(const Point& p, const Point& linePoint, double direction) 
+{
+    double dx = std::cos(direction);
+    double dy = std::sin(direction);
+
+    return std::abs(dy * (p.x - linePoint.x) - dx * (p.y - linePoint.y)) / std::sqrt(dx * dx + dy * dy);
+}
+
+// 判断点在直线的哪一侧
+int PointProcess::getSideOfLine(const Point& p, const Point& linePoint, double direction) {
+    double dx = std::cos(direction);
+    double dy = std::sin(direction);
+
+    // 使用直线方程符号判断侧边
+    double value = dy * (p.x - linePoint.x) - dx * (p.y - linePoint.y);
+    
+    if (value > 0) return 1;   // 点在直线一侧
+    if (value < 0) return -1;  // 点在直线另一侧
+    return 0;  // 点在直线上
+}
+
+
+bool PointProcess::findClosestPointAndClassify(const std::vector<Point>& _points)
+{	
+	if (_points.empty()) return false;
+
+	double minDistance = std::numeric_limits<double>::max();
+    bool found = false;
+
+	// 读取 JSON 文件
+	std::ifstream json_file("/home/ymm/dumping_line_ros/config.json");
+    Json::Reader reader;
+    Json::Value root;
+
+    if (!reader.parse(json_file, root, false)) {
+        ROS_ERROR("Failed to parse the JSON file.");
+        return false;
+    }
+	
+	// 直线的起点（由 Pose 中的 position 决定）
+    Point posePosition;
+    posePosition.x = root["pose"]["position"]["x"].asDouble();
+    posePosition.y = root["pose"]["position"]["y"].asDouble();
+
+	// 直线的方向（由 Pose 中的 orientation 决定）
+	geometry_msgs::Pose initial_pose;
+    initial_pose.orientation.z = root["pose"]["orientation"]["z"].asDouble();
+    initial_pose.orientation.w = root["pose"]["orientation"]["w"].asDouble();
+	double yaw = atan2(initial_pose.orientation.z, initial_pose.orientation.w) * 2;
+
+    // 遍历所有点，进行最近点判断以及分类
+    for (const auto& point : _points) {
+        // 计算到直线的距离
+        double distance = getDistanceToLine(point, posePosition, yaw);
+        if (distance < minDistance) {
+            minDistance = distance;
+            closestPoint = point;
+            found = true;
+        }
+
+        // 判断点位于哪一侧
+        int side = getSideOfLine(point, posePosition, yaw);
+        if (side > 0) {
+            sideA.push_back(point);  // 一侧
+        } else if (side < 0) {
+            sideB.push_back(point);  // 另一侧
+        }
+        // 如果 side == 0，则点在直线上，忽略
+    }
+	std::cout << "Closest Point: (" << closestPoint.x << ", " << closestPoint.y << ")" << std::endl;
+	return found;
+}
+
+std::pair<double, std::vector<Point>> PointProcess::combineResults(const std::pair<double, std::vector<Point>>& resultA, const std::pair<double, std::vector<Point>>& resultB) {
+    // 复制 resultA 和 resultB 的路径
+    std::vector<Point> pathA = resultA.second;
+    std::vector<Point> pathB = resultB.second;
+
+    // 反转 pathA
+    std::reverse(pathA.begin(), pathA.end());
+
+    // 组合两个路径
+    pathA.insert(pathA.end(), pathB.begin(), pathB.end());
+
+    // 计算总距离，这里假设你需要计算新的总距离
+    double total_distance = resultA.first + resultB.first;  // 根据实际情况调整计算方式
+
+    return {total_distance, pathA};
+}
+
+void PointProcess::getOrigiPointsFromGridPoints(const nav_msgs::OccupancyGrid _gridPoints, const int _upper_limit, const int _lower_limit, const int _first_index, const int _second_index)
 {
 	ROS_ASSERT(_upper_limit <=100 && _lower_limit >= 0);
 	origiPoints.clear();
@@ -214,23 +299,26 @@ void PointProcess::getOrigiPointsFromGridPoints(const nav_msgs::OccupancyGrid _g
 				_point.y = static_cast<int>(i/_width)*_resolution+0.5*_resolution + _y_0;
 				origiPoints.push_back(_point);
 				loop = 0;
-				std::cout << num << " " << _point.x << " " << _point.y << std::endl;
+				// std::cout << num << " " << _point.x << " " << _point.y << std::endl;
 				num++;
 			}
 		}
 	}
+	findClosestPointAndClassify(origiPoints);
+	
 	TSPSolver solver;
-	solver.setPoints(origiPoints);
-    auto result = solver.findBestGreedyStart();
-	origiPoints = sortPointsByOrder(origiPoints, result.second);
+	auto resultA = solver.solveGreedyTSPWithStartPoint(closestPoint, sideA);
+	auto resultB = solver.solveGreedyTSPWithStartPoint(closestPoint, sideB);
+	
+	origiPoints = std::move(combineResults(resultA, resultB).second);
 
-	num = 0;
-	for (const auto& p : origiPoints) {
-        std::cout << num << " " << p.x << " " << p.y << std::endl;
-		num++;
-    }
+	// num = 0;
+	// for (const auto& p : origiPoints) {
+    //     std::cout << num << " " << p.x << " " << p.y << std::endl;
+	// 	num++;
+    // }
 	// std::cout << "========================" << std::endl;
 	// std::cout << "min_left_index " << _min_left_index << " min_right_index " << _min_right_index << std::endl;
-	cutGridPoints(_gridPoints, _min_left_index, _min_right_index);
+	cutGridPoints(_gridPoints, _first_index, _second_index);
 	
 }

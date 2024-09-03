@@ -75,7 +75,7 @@ bool convolution::parseJsonFile(const string& filename) {
     recommend_pose.orientation.z = root["pose"]["orientation"]["z"].asDouble();
     recommend_pose.orientation.w = root["pose"]["orientation"]["w"].asDouble();
 
-    std::cout << recommend_pose.position.x << " " << recommend_pose.position.y  << std::endl;
+    // std::cout << recommend_pose.position.x << " " << recommend_pose.position.y  << std::endl;
     
     angle_right = root["angles"]["angle_right"].asDouble();
     angle_left = root["angles"]["angle_left"].asDouble();
@@ -86,8 +86,8 @@ bool convolution::parseJsonFile(const string& filename) {
 void convolution::main_loop()
 {
     ros::Rate sleep(1);
+    double convolutionStartTime = ros::Time::now().toSec();
     core.scale = 2;
-    double convolutionStartTime, convolutionCostTime;
     while(ros::ok())
     {
         ros::spinOnce();//此处执行回调函数
@@ -111,8 +111,6 @@ void convolution::main_loop()
             //卷积算法
             convolutionStartTime = ros::Time::now().toSec();
             calcConvolution2x2();
-            convolutionCostTime = ros::Time::now().toSec() - convolutionStartTime;
-            ROS_INFO("Time cost fot map convolution = %f ms", convolutionCostTime*1000);
             pub_grid_after_conv.publish(grid_after_conv);//保留挡墙内边缘
 
             PointProcess process(5, quniform, grid_after_conv, 0, 100 , first_index, second_index);
@@ -134,7 +132,8 @@ void convolution::main_loop()
             std::string file_name = "/home/ymm/dumping_line_ros/point.csv";  // 定义要保存的文件名
             fitter.savePointsToFile(fitted_points, file_name);  // 调用函数，保存点到文件
 
-            ROS_INFO("Succeed in Making Sure GOUND PARK POSITION.");
+            double convolutionCostTime = ros::Time::now().toSec() - convolutionStartTime;
+            ROS_INFO("Time cost fot map convolution = %f ms", convolutionCostTime*1000);
                 
             //程序复位
             reset();
@@ -395,7 +394,7 @@ bool convolution::getOrientedAreaInGrid(const float step_dist)
 
         if(temp_index == curIndex){continue;}
         else{curIndex = temp_index;}
-        // ROS_INFO("x = %f, y = %f, index = %d", temp_point.x, temp_point.y, temp_index);
+
         if(temp_index >= grid.data.size() || temp_point.x >= grid.info.resolution*grid.info.width
             || temp_point.y >=  grid.info.resolution * grid.info.height
             || temp_point.x < 0|| temp_point.y < 0)
@@ -409,6 +408,8 @@ bool convolution::getOrientedAreaInGrid(const float step_dist)
             findPoint = true;
         }
     }while(!overflow && !findPoint);//若未溢出且未找到符合条件栅格点则继续循环
+
+    ROS_INFO("x = %f, y = %f, index = %d", temp_point.x, temp_point.y, temp_index);
 
     //若溢出
     if(overflow){return false;}

@@ -26,20 +26,24 @@ class PointProcess
 		int low_limit = 0;
 		int up_limit = 0;
 		int simple_sample_scale = 1;
+		Point closestPoint;
 		nav_msgs::OccupancyGrid origiGrid;
-		std::vector<Point> origiPoints;//初始点集
+		std::vector <Point> origiPoints;//初始点集
+		std::vector <Point> sideA;
+		std::vector <Point> sideB;
 
 		ros::NodeHandle nh;
 		// std::vector<Point> sampledPoints;//稀疏采样后的点集
 	
 		nav_msgs::OccupancyGrid maxAreaOccupancyGrid(const nav_msgs::OccupancyGrid& grid);
 		int dfs(std::vector<int8_t>& gridData, int x, int y, int width, int height, int index, std::vector<std::pair<int, int>>& islandIndices);
-		std::vector<Point> sortPointsByOrder(const std::vector<Point>& points, const std::vector<int>& order);
 		void getOrigiPointsFromGridPoints(const nav_msgs::OccupancyGrid _gridPoints, const int _upper_limit, const int _lower_limit, const int _min_left_index, const int _min_right_index);
 		double euclideanDistance(const Point& p1, const Point& p2);
 		size_t findClosestPointIndex(const std::vector<Point>& points, const Point& givenPoint);
 		void cutGridPoints(const nav_msgs::OccupancyGrid _gridPoints, const int min_left_index, const int min_right_index);
-
-
+		double getDistanceToLine(const Point& p, const Point& linePoint, double direction);
+		int getSideOfLine(const Point& p, const Point& linePoint, double direction);
+		bool findClosestPointAndClassify(const std::vector<Point>& _points);
+		std::pair<double, std::vector<Point>> combineResults(const std::pair<double, std::vector<Point>>& resultA, const std::pair<double, std::vector<Point>>& resultB);
 
 };// end class
