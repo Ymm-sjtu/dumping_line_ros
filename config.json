@@ -1,20 +1,20 @@
 {
-    "map_path": "/home/ymm/dumping_line_ws/src/map_publish/json/L2.json",
+    "map_path": "/home/ymm/dumping_line_ros/src/map_publish/json/L4(2).json",
     "pose": {
         "position": {
-            "x": -450.298,
-            "y": 892.207,
+            "x": -401.617,
+            "y": 660.388,
             "z": 0.0
         },
         "orientation": {
             "x": 0.0,
             "y": 0.0,
-            "z": -0.014,
-            "w": 1
+            "z": -0.707,
+            "w": 0.707
         }
     },
     "angles": {
-        "angle_right": 40.0,
+        "angle_right": 89.0,
         "angle_left": -90.0
     }
 }

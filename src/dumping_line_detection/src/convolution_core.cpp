@@ -74,6 +74,8 @@ bool convolution::parseJsonFile(const string& filename) {
     recommend_pose.orientation.y = root["pose"]["orientation"]["y"].asDouble();
     recommend_pose.orientation.z = root["pose"]["orientation"]["z"].asDouble();
     recommend_pose.orientation.w = root["pose"]["orientation"]["w"].asDouble();
+
+    std::cout << recommend_pose.position.x << " " << recommend_pose.position.y  << std::endl;
     
     angle_right = root["angles"]["angle_right"].asDouble();
     angle_left = root["angles"]["angle_left"].asDouble();
@@ -89,7 +91,7 @@ void convolution::main_loop()
     while(ros::ok())
     {
         ros::spinOnce();//此处执行回调函数
-        bool ifReadJson = parseJsonFile("/home/ymm/dumping_line_ws/config.json");
+        bool ifReadJson = parseJsonFile("/home/ymm/dumping_line_ros/config.json");
         if(grid.header.frame_id != "null" && ifSubGrid && ifReadJson)
         {
             recommend_pose.position.x -= grid.info.origin.position.x;
@@ -113,7 +115,7 @@ void convolution::main_loop()
             ROS_INFO("Time cost fot map convolution = %f ms", convolutionCostTime*1000);
             pub_grid_after_conv.publish(grid_after_conv);//保留挡墙内边缘
 
-            PointProcess process(5, quniform, grid_after_conv, 0, 100 , min_left_index, min_right_index);
+            PointProcess process(5, quniform, grid_after_conv, 0, 100 , first_index, second_index);
             pub_grid_after_dfs.publish(process.gridAfterDfs);
             pub_marker_b_spline.publish(process.marker_line);
             //排土线
@@ -129,7 +131,7 @@ void convolution::main_loop()
                 fitted_points.points.push_back(fitter.poses.at(i).position);
             }
 
-            std::string file_name = "/home/ymm/dumping_line_ws/points.csv";  // 定义要保存的文件名
+            std::string file_name = "/home/ymm/dumping_line_ros/point.csv";  // 定义要保存的文件名
             fitter.savePointsToFile(fitted_points, file_name);  // 调用函数，保存点到文件
 
             ROS_INFO("Succeed in Making Sure GOUND PARK POSITION.");
@@ -266,28 +268,39 @@ bool convolution::cutGridMap()
         }
     }
 
-    for (int i = 0; i < height; ++i) {
-        for (int j = 0; j < width; ++j) {
-            // 计算栅格在数据数组中的索引
-            int index = i * width + j;
-            //找到grid_after_cut中带入直线方程后绝对值最小的栅格点
-            if(grid_after_cut.data[index] == 100)
-            {
-                left_abs = std::abs(i - k_n*j - b_n);
-                right_abs = std::abs(i - k_p*j - b_p);
-                if(left_abs < min_left_abs)
-                {
-                    min_left_abs = left_abs;
-                    min_left_index = index;
-                }
-                if(right_abs < min_right_abs)
-                {
-                    min_right_abs = right_abs;
-                    min_right_index = index;
-                }
+    int index = 0;
+    double angle_right_ori = angle_right;
+    double angle_left_ori = angle_left;
+    while(angle_right > 0){
+        if(isLineCrossingMap(angle_right,index) == 1)
+        {
+            while(isLineCrossingMap(angle_right+1,index) == 1 && angle_right < angle_right_ori)
+            {    
+                angle_right ++;
+                std::cout<< "angle_right = " << angle_right << std::endl;
             }
+            first_index = index;
+            break;
         }
+        else
+            angle_right -= 5;
     }
+
+    while(angle_left < 0){
+        if(isLineCrossingMap(angle_left,index) == 1)
+        {
+            while(isLineCrossingMap(angle_left-1,index) == 1 && angle_left > angle_left_ori)
+            {    
+                angle_left --;
+                std::cout<< "angle_left = " << angle_left << std::endl;
+            }
+            second_index = index;
+            break;
+        }
+        else
+            angle_left += 5;
+    }
+    
     // int min_left_x = min_left_index % width;
     // int min_left_y = min_left_index / width;
     // int min_right_x = min_right_index % width;
@@ -297,6 +310,52 @@ bool convolution::cutGridMap()
     // std::cout << "min_right_x = " << min_right_x << " min_right_y = " << min_right_y << std::endl;
 
     return true;
+}
+
+bool convolution::isLineCrossingMap(double angle, int & final_index)
+{
+    // geometry_msgs::Pose initial_pose = recommend_pose;
+    // geometry_msgs::Point newPos = getNewPosition(initial_pose, 5);
+    double rotation_angle = angle * M_PI / 180.0;  // 转换为弧度
+
+    double k, b;
+    bool is_not_vertical = computeRotatedLineEquation(recommend_pose, rotation_angle, k, b);
+
+    if (is_not_vertical) {
+        std::cout << "旋转后的直线方程: y = " << k << " * x + " << b << std::endl;
+    } else {
+        std::cout << "旋转后的直线方程: x = " << recommend_pose.position.x << std::endl;
+        return false;
+    }
+
+    int width = grid_after_cut.info.width;
+    int height = grid_after_cut.info.height;
+
+    bool flag_grid_map;
+    double result = 0, min_result = 100;
+    // 遍历栅格地图的每个栅格
+    for (int i = 0; i < height; ++i) {
+        for (int j = 0; j < width; ++j) {
+            int index = i * width + j;
+            if(grid_after_cut.data[index] == 100)
+            {
+                result = std::abs(i - k*j - b);
+                if(result < min_result)
+                {
+                    min_result = result;
+                    final_index = index;
+                }
+            }
+        }
+    }
+    if (min_result < grid_after_cut.info.resolution)
+    {
+        return true;
+    }
+    else
+    {
+        return false;
+    }
 }
 
 /**

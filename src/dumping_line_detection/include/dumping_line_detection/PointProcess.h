@@ -13,7 +13,7 @@ class PointProcess
 	public:
     	std::vector<Point> trackPoints;
 		std::vector<geometry_msgs::Point> trackPointsVec;
-		PointProcess(const int _scale, const int _type, const nav_msgs::OccupancyGrid _grid, const int _low_limit, const int _up_limit, const int _min_left_index, const int _min_right_index);
+		PointProcess(const int _scale, const int _type, const nav_msgs::OccupancyGrid _grid, const int _low_limit, const int _up_limit, const int _first_index, const int _second_index);
 		// bSplinePlanning(const int _scale, const int _type, const std::vector<Point> _points, int _low_limit, int _up_limit);
 		~PointProcess(){};
 

@@ -10,7 +10,7 @@ MapPublisher::MapPublisher() {
     map_pub_after_open_close = nh.advertise<nav_msgs::OccupancyGrid>("map_open_close", 10);
     map_pub_after_open = nh.advertise<nav_msgs::OccupancyGrid>("map_open", 10);
 
-    std::string map_path = getMapPath("/home/ymm/dumping_line_ws/config.json");
+    std::string map_path = getMapPath("/home/ymm/dumping_line_ros/config.json");
     // 读取JSON文件
     std::ifstream json_file(map_path);
     Json::Reader reader;

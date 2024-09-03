@@ -115,7 +115,7 @@ class convolution{
         double angle_right = 0.0;
         double angle_left = 0.0;
         //Grid Map after Cut
-        int min_left_index = 0, min_right_index = 0;
+        int first_index = 0, second_index = 0;
 
         //订阅车体信息
         geometry_msgs::Point vehicle_position;
@@ -153,6 +153,7 @@ class convolution{
         std::pair<int, int> convolute(const std::vector<int> *arr);
         void reset();
         bool cutGridMap();
+        bool isLineCrossingMap(double angle, int & final_index);
         geometry_msgs::Point getNewPosition(const geometry_msgs::Pose& pose, double distance);
         bool computeRotatedLineEquation(const geometry_msgs::Pose& pose, double rotation_angle, double& k, double& b);
         void getNearbyIndex2x2(const int, std::vector<int> *, const int, const int);
