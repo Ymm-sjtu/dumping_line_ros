@@ -98,15 +98,15 @@ void convolution::main_loop()
             recommend_pose.position.y -= grid.info.origin.position.y;
             ROS_INFO("Receive ALL : Convolution Process Start.");
 
+            vehicle_posi_index = getIndex(vehicle_position);
+            bool ifCleaned = getOrientedAreaInGrid(0.02);//函数前后只有grid发生了变化
+
             //cut the grid map
             ROS_ASSERT_MSG(cutGridMap() == true,"Please select a recommended posture again");
             pub_grid_after_cut.publish(grid_after_cut);
 
-            vehicle_posi_index = getIndex(vehicle_position);
 
             grid = grid_after_cut;
-        
-            bool ifCleaned = getOrientedAreaInGrid(0.02);//函数前后只有grid发生了变化
 
             //卷积算法
             convolutionStartTime = ros::Time::now().toSec();
@@ -259,7 +259,7 @@ bool convolution::cutGridMap()
             // 检查栅格的值是否满足条件
             if (flag_grid_map_p == flag_p && flag_grid_map_n == flag_n) {
                 // 符合条件，保留值不变
-                grid_after_cut.data[index] = grid.data[index];
+                grid_after_cut.data[index] = grid_after_found.data[index];
             } else {
                 // 不符合条件，置为0
                 grid_after_cut.data[index] = 0;

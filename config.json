@@ -1,9 +1,9 @@
 {
-    "map_path": "/home/ymm/dumping_line_ros/src/map_publish/json/L4(2).json",
+    "map_path": "/home/ymm/dumping_line_ros/src/map_publish/json/L2(1).json",
     "pose": {
         "position": {
-            "x": -401.617,
-            "y": 660.388,
+            "x": -380,
+            "y": 840,
             "z": 0.0
         },
         "orientation": {

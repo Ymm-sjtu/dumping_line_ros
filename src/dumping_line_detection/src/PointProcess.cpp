@@ -311,6 +311,7 @@ void PointProcess::getOrigiPointsFromGridPoints(const nav_msgs::OccupancyGrid _g
 	auto resultB = solver.solveGreedyTSPWithStartPoint(closestPoint, sideB);
 	
 	origiPoints = std::move(combineResults(resultA, resultB).second);
+	std::cout << "排土线总长度约为：" << combineResults(resultA, resultB).first << "m" << std::endl;
 
 	// num = 0;
 	// for (const auto& p : origiPoints) {
