@@ -12,7 +12,6 @@ class TSPSolver {
 public:
     TSPSolver();
     void setPoints(const std::vector<Point>& newPoints);
-    std::vector<Point> readPointsFromFile(const std::string& filename);
     std::pair<double, std::vector<Point>> solveGreedyTSPWithStartPoint(const Point& start_point, const std::vector<Point>& points);
 
 private:

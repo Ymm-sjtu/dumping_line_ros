@@ -1,14 +1,14 @@
 #include "dumping_line_detection/TSPSolver.h"
-#include <fstream>
-#include <sstream>
 #include <cmath>
 #include <limits>
-#include <iostream>
 #include <vector>
+#include <iostream>
 
 TSPSolver::TSPSolver() {}
 
 void TSPSolver::setPoints(const std::vector<Point>& newPoints) {
+    points.clear();
+    distance_matrix.clear();
     points = newPoints;
     // 初始化距离矩阵
     int n = points.size();
@@ -19,36 +19,6 @@ void TSPSolver::setPoints(const std::vector<Point>& newPoints) {
             distance_matrix[j][i] = distance_matrix[i][j];  // 对称距离矩阵
         }
     }
-}
-
-std::vector<Point> TSPSolver::readPointsFromFile(const std::string& filename) {
-    std::ifstream file(filename);
-    std::string line;
-    std::vector<Point> loadedPoints;
-    if (file.is_open()) {
-        while (getline(file, line)) {
-            std::istringstream iss(line);
-            std::string part;
-            std::vector<std::string> parts;
-            while (iss >> part) {
-                parts.push_back(part);
-            }
-            if (parts.size() >= 3) {
-                try {
-                    double x = std::stod(parts[1]);
-                    double y = std::stod(parts[2]);
-                    loadedPoints.push_back({x, y});
-                } catch (std::exception& e) {
-                    std::cout << "转换坐标到浮点数时出错，在这一行：" << line << std::endl;
-                }
-            }
-        }
-        file.close();
-    } else {
-        std::cout << "无法打开文件：" << filename << std::endl;
-    }
-    setPoints(loadedPoints);  // 设置点并计算距离矩阵
-    return points;
 }
 
 double TSPSolver::distance(const Point& p1, const Point& p2) {
